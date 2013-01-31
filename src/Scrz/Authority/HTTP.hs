@@ -28,12 +28,8 @@ data Scrape = Scrape
 instance A.FromJSON Scrape where
     parseJSON (A.Object x) = Scrape <$> x A..: "id" <*> x A..: "slug" <*> x A..: "hash" <*> x A..: "init" <*> x A..: "env"
 
-scrape :: URI -> IO (Maybe Scrape)
-scrape uri = do
-    let auth = uriRegName $ fromJust $ uriAuthority uri
-    let path = uriPath uri
-    let url  = "http://" ++ auth ++ "/svc" ++ path ++ "/scrape"
-    logger $ "Scrape URL " ++ url
+scrape :: String -> IO (Maybe Scrape)
+scrape url = do
     (code, stream :: LB.ByteString) <- curlGetString_ url curlOptions
     case code of
         CurlOK    -> return $ A.decode stream
@@ -47,12 +43,16 @@ sleep x = threadDelay $ x * 1000000
 
 syncState sharedState uri = do
     let auth = uriRegName $ fromJust $ uriAuthority uri
+    let path = uriPath uri
+
+    let scrapeUrl = "http://" ++ auth ++ "/svc" ++ path ++ "/scrape"
+    logger $ "Scrape URL " ++ scrapeUrl
 
     state <- atomically $ readTVar sharedState
     if not (running state)
     then return ()
     else do
-        download <- scrape uri
+        download <- scrape scrapeUrl
         case download of
             Nothing -> logger "failed to get download" >> repeat
             Just (Scrape id slug hash init env) -> do
