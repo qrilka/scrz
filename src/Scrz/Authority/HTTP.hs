@@ -26,7 +26,13 @@ data Scrape = Scrape
   }
 
 instance A.FromJSON Scrape where
-    parseJSON (A.Object x) = Scrape <$> x A..: "id" <*> x A..: "slug" <*> x A..: "hash" <*> x A..: "init" <*> x A..: "env"
+    parseJSON (A.Object x) = Scrape
+        <$> x A..: "id"
+        <*> x A..: "slug"
+        <*> x A..: "hash"
+        <*> x A..: "init"
+        <*> x A..: "env"
+
 
 scrape :: String -> IO (Maybe Scrape)
 scrape url = do
@@ -39,8 +45,8 @@ scrape url = do
 
     curlOptions = [ CurlPost False, CurlNoBody False, CurlFollowLocation True ]
 
-sleep x = threadDelay $ x * 1000000
 
+syncState :: TVar State -> URI -> IO ()
 syncState sharedState uri = do
     let auth = uriRegName $ fromJust $ uriAuthority uri
     let path = uriPath uri
@@ -63,4 +69,5 @@ syncState sharedState uri = do
 
   where
 
+    sleep x = threadDelay $ x * 1000000
     repeat = sleep 9 >> syncState sharedState uri
