@@ -10,6 +10,7 @@ import           Control.Concurrent
 import           Control.Concurrent.STM
 import           Control.Monad
 
+import           Network.BSD
 import           Network.Curl
 import           Network.URI
 
@@ -19,6 +20,7 @@ import           Scrz.State
 
 data Scrape = Scrape
   { scrapeId :: Int
+  , scrapeService :: String
   , scrapeSlug :: String
   , scrapeHash :: String
   , scrapeInit :: String
@@ -28,13 +30,14 @@ data Scrape = Scrape
 instance A.FromJSON Scrape where
     parseJSON (A.Object x) = Scrape
         <$> x A..: "id"
+        <*> x A..: "service"
         <*> x A..: "slug"
         <*> x A..: "hash"
         <*> x A..: "init"
         <*> x A..: "env"
 
 
-scrape :: String -> IO (Maybe Scrape)
+scrape :: String -> IO (Maybe [Scrape])
 scrape url = do
     (code, stream :: LB.ByteString) <- curlGetString_ url curlOptions
     case code of
@@ -48,26 +51,35 @@ scrape url = do
 
 syncState :: TVar State -> URI -> IO ()
 syncState sharedState uri = do
-    let auth = uriRegName $ fromJust $ uriAuthority uri
-    let path = uriPath uri
+    hostName <- getHostName
+    logger $ "Scrape URL " ++ (scrapeUrl hostName)
+    loop
 
-    let scrapeUrl = "http://" ++ auth ++ "/svc" ++ path ++ "/scrape"
-    logger $ "Scrape URL " ++ scrapeUrl
-
-    state <- atomically $ readTVar sharedState
-    if not (running state)
-    then return ()
-    else do
-        download <- scrape scrapeUrl
-        case download of
-            Nothing -> logger "failed to get download" >> repeat
-            Just (Scrape id slug hash init env) -> do
-                let slugUrl = "http://" ++ auth ++ "/slug/" ++ slug
-                let release = Release (slug ++ "@" ++ (show id)) slugUrl hash env init
-                activateService sharedState (tail $ uriPath uri) release
-                repeat
 
   where
+    auth = uriRegName $ fromJust $ uriAuthority uri
+    port = uriPort $ fromJust $ uriAuthority uri
+
+    scrapeUrl hostName = "http://" ++ auth ++ port ++ "/api/scrape?host=" ++ hostName
+
+    loop = do
+        state <- atomically $ readTVar sharedState
+        if not (running state)
+        then return ()
+        else do
+            hostName <- getHostName
+            download <- scrape (scrapeUrl hostName)
+            case download of
+                Nothing -> logger "failed to get download" >> repeat
+                Just scrapes -> do
+                    mapM_ (activate uri) scrapes
+                    repeat
 
     sleep x = threadDelay $ x * 1000000
-    repeat = sleep 9 >> syncState sharedState uri
+    repeat = sleep 9 >> loop
+
+    activate :: URI -> Scrape -> IO ()
+    activate uri (Scrape id service slug hash init env) = do
+        let slugUrl = "http://" ++ auth ++ port ++  "/api/slugs/" ++ slug
+        let release = Release (service ++ "@" ++ (show id)) slugUrl hash env init
+        activateService sharedState service release
