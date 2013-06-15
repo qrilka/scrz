@@ -1,8 +1,10 @@
 module Scrz.Network where
 
+import Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as S
 
+import Control.Exception
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TVar
@@ -58,21 +60,25 @@ releaseAddress :: TVar Runtime -> IPv4 -> IO ()
 releaseAddress runtime addr = atomically $ do
     modifyTVar runtime $ \x -> x { networkAddresses = S.insert addr (networkAddresses x)}
 
-allocatePort :: TVar Runtime -> IO Int
-allocatePort runtime = atomically $ do
+allocatePort :: TVar Runtime -> Port -> IO Int
+allocatePort runtime port = atomically $ do
     rt <- readTVar runtime
     let ports = networkPorts rt
-    let ret = head $ S.toList ports
-    writeTVar runtime $ rt { networkPorts = S.delete ret ports }
-    return ret
+    let ext = fromMaybe (head $ S.toList ports) (externalPort port)
+    if S.member ext ports
+        then do
+            writeTVar runtime $ rt { networkPorts = S.delete ext ports }
+            return ext
+        else
+            error $ "Can not allocate external port " ++ (show $ externalPort port)
 
 releasePort :: TVar Runtime -> Int -> IO ()
 releasePort runtime port = atomically $ do
     modifyTVar runtime $ \x -> x { networkPorts = S.insert port (networkPorts x)}
 
-mapPorts :: IPv4 -> [ (Int,Int) ] -> IO ()
+mapPorts :: IPv4 -> [ (Int,Port) ] -> IO ()
 mapPorts addr ports = do
-    mapM_ (\x -> updateForwardRule "-A" addr (fst x) (snd x)) ports
+    mapM_ (\x -> updateForwardRule "-A" addr (fst x) (internalPort $ snd x)) ports
 
 
 unmapPorts :: IPv4 -> [ (Int,Int) ] -> IO ()

@@ -22,6 +22,7 @@ import Scrz.Utils
 import Scrz.Image
 import Scrz.LXC
 import Scrz.Network
+import Scrz.Volume
 
 
 createContainer :: TVar Runtime -> Authority -> Service -> IO (TVar Container)
@@ -29,10 +30,11 @@ createContainer runtime authority service = do
     id <- newId
 
 
- -- Allocate runtime resources (address, ports).
-    addr  <- allocateAddress runtime
-    ports <- replicateM (length $ servicePorts service) (allocatePort runtime)
-    --mapPorts addr $ zip ports $ servicePorts service
+ -- Allocate runtime resources (address, ports, volumes etc).
+    addr <- allocateAddress runtime
+    externalPorts <- forM (servicePorts service) (allocatePort runtime)
+    mapPorts addr $ zip externalPorts $ servicePorts service
+    backingVolumes <- allocateVolumes runtime service
 
 
  -- Prepare the filesystem (clone image, write LXC config file).
@@ -47,7 +49,7 @@ createContainer runtime authority service = do
 
 
  -- Register the container in the runtime.
-    container <- newTVarIO $ Container id authority service addr ports [] Nothing
+    container <- newTVarIO $ Container id authority service addr externalPorts backingVolumes Nothing
     atomically $ modifyTVar runtime $ \x ->
         x { containers = M.insert id container (containers x) }
 
