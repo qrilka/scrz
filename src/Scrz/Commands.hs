@@ -20,14 +20,31 @@ import Scrz.Image
 
 data Command
   = Quit
-  | CreateContainer String String
+  | CreateContainer Service
   | ListContainers
   | StopContainer String
   | Start String
   | DestroyContainer String
   | Snapshot String String
-  deriving (Show)
 
+
+instance FromJSON Service where
+    parseJSON (Object o) = fail "fail"
+instance FromJSON Image where
+    parseJSON (Object o) = fail "fail"
+instance FromJSON Port where
+    parseJSON (Object o) = fail "fail"
+instance FromJSON Volume where
+    parseJSON (Object o) = fail "fail"
+
+instance ToJSON Service where
+    toJSON = undefined
+instance ToJSON Image where
+    toJSON = undefined
+instance ToJSON Port where
+    toJSON = undefined
+instance ToJSON Volume where
+    toJSON = undefined
 
 instance FromJSON Command where
     parseJSON (Object o) = do
@@ -40,7 +57,7 @@ instance FromJSON Command where
         parseCommand "quit" o = return Quit
         parseCommand "list-container" o = return ListContainers
         parseCommand "stop-container" o = StopContainer <$> (o .: "id")
-        parseCommand "create-container" o = CreateContainer <$> (o .: "image") <*> (o .: "service")
+        parseCommand "create-container" o = CreateContainer <$> (o .: "service")
         parseCommand "destroy-container" o = DestroyContainer <$> (o .: "id")
         parseCommand "snapshot" o = Snapshot <$> (o .: "container") <*> (o .: "image")
         parseCommand "start" o = Start <$> (o .: "id")
@@ -64,9 +81,9 @@ instance ToJSON Command where
         let command = "destroy-container" :: String
         in object ["command" .= command, "id" .= id]
 
-    toJSON (CreateContainer image service) =
+    toJSON (CreateContainer service) =
         let command = "create-container" :: String
-        in object ["command" .= command, "image" .= image, "service" .= service]
+        in object ["command" .= command, "service" .= service]
 
     toJSON (Snapshot container image) =
         let command = "snapshot" :: String
@@ -113,20 +130,14 @@ processCommand runtime Quit = do
     logger "Received <quit> command."
     error "exiting"
 
-processCommand runtime (CreateContainer image service) = do
-    logger $ "Creating container " ++ image ++ " " ++ service
+processCommand runtime (CreateContainer service) = do
+    logger $ "Creating container " ++ (show $ serviceRevision service)
 
-    let img = Image image
     rt <- atomically $ readTVar runtime
-    case M.lookup service (services rt) of
-        Nothing -> do
-            logger "service not found"
-            return EmptyResponse
-        Just s -> do
-            container <- createContainer runtime img s
-            startContainer runtime container
-            id <- atomically $ containerId <$> readTVar container
-            return $ CreateContainerResponse id
+    container <- createContainer runtime service
+    startContainer runtime container
+    id <- atomically $ containerId <$> readTVar container
+    return $ CreateContainerResponse id
 
 processCommand runtime ListContainers = do
     rt <- atomically $ readTVar runtime
@@ -140,7 +151,7 @@ processCommand runtime ListContainers = do
         c <- atomically $ readTVar container
 
         let cid = containerId c
-        let iid = imageId $ containerImage c
+        let iid = imageId $ serviceImage $ containerService c
         let cmd = head $ serviceCommand $ containerService c
         let sta = if isJust $ containerProcess c then "running" else "stopped"
         return [ cid, iid, cmd, sta ]

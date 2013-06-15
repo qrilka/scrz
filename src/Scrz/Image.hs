@@ -19,7 +19,7 @@ baseImageDirectory = "/srv/scrz/images"
 loadImages :: IO (Map String Image)
 loadImages = do
     images <- getDirectoryContents baseImageDirectory
-    return $ M.fromList $ map (\id -> (id, Image id)) images
+    return $ M.fromList $ map (\id -> (id, Image id "" 0)) images
 
 
 cloneImage :: Image -> String -> IO ()

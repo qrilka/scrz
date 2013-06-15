@@ -42,15 +42,12 @@ createControlThread mvar runtime = do
 initializeRuntime :: IO Runtime
 initializeRuntime = do
     (bridgeAddress, networkAddresses, networkPorts) <- initializeNetwork "scrz"
-    images <- loadImages
-    services <- loadServices
 
     return $ Runtime
       { bridgeAddress    = bridgeAddress
       , networkAddresses = networkAddresses
       , networkPorts     = networkPorts
-      , images           = images
-      , services         = services
+      , backingVolumes   = M.empty
       , containers       = M.empty
       }
 
@@ -72,8 +69,8 @@ run [ "supervisor" ] = do
 
     cleanupNetwork
 
-run [ "create-container", name, image ] = do
-    sendCommand $ CreateContainer name image
+run [ "create-container", name, image ] = undefined
+    --sendCommand $ CreateContainer name image
 
 run [ "list-containers" ] = do
     sendCommand $ ListContainers

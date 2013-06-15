@@ -44,7 +44,6 @@ handleClient runtime socket = do
             return ()
 
         Just cmd -> do
-            logger $ show cmd
             response <- processCommand runtime cmd
             sendAll clientSocket $ encode response
             close clientSocket

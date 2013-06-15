@@ -24,15 +24,15 @@ import Scrz.LXC
 import Scrz.Network
 
 
-createContainer :: TVar Runtime -> Image -> Service -> IO (TVar Container)
-createContainer runtime image service = do
+createContainer :: TVar Runtime -> Service -> IO (TVar Container)
+createContainer runtime service = do
     id <- newId
 
 
  -- Allocate runtime resources (address, ports).
     addr  <- allocateAddress runtime
     ports <- replicateM (length $ servicePorts service) (allocatePort runtime)
-    mapPorts addr $ zip ports $ servicePorts service
+    --mapPorts addr $ zip ports $ servicePorts service
 
 
  -- Prepare the filesystem (clone image, write LXC config file).
@@ -42,12 +42,12 @@ createContainer runtime image service = do
     gatewayAddress <- atomically $ bridgeAddress <$> readTVar runtime
 
     createDirectoryIfMissing True containerPath
-    cloneImage image rootfsPath
+    cloneImage (serviceImage service) rootfsPath
     writeFile lxcConfigPath $ lxcConfig id addr gatewayAddress rootfsPath
 
 
  -- Register the container in the runtime.
-    container <- newTVarIO $ Container id image service addr ports Nothing
+    container <- newTVarIO $ Container id service addr ports [] Nothing
     atomically $ modifyTVar runtime $ \x ->
         x { containers = M.insert id container (containers x) }
 
@@ -75,7 +75,7 @@ startContainer runtime container = do
             let sports  = servicePorts $ containerService c
             let cports  = containerPorts c
             let ports   = zip sports cports
-            let portmap = map (\(int, ext) -> (show int) ++ "=" ++ (show ext)) ports
+            let portmap = map (\(int, ext) -> (show $ internalPort int) ++ "=" ++ (show ext)) ports
             let env2    = ( "PORTMAP", intercalate " " portmap ) : env1
 
 
@@ -116,7 +116,7 @@ destroyContainer runtime container0 = do
     let ports   = containerPorts container
     let addr    = containerAddress container
 
-    unmapPorts addr $ zip ports $ servicePorts service
+    --unmapPorts addr $ zip ports $ servicePorts service
     mapM_ (releasePort runtime) ports
     releaseAddress runtime addr
 

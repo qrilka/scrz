@@ -64,4 +64,3 @@ Executable scrz
     Extensions:     ViewPatterns
 
     Ghc-Options:    -threaded
-    -- -static -optc-static -optl-static
