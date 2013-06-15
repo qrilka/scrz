@@ -81,9 +81,9 @@ mapPorts addr ports = do
     mapM_ (\x -> updateForwardRule "-A" addr (fst x) (internalPort $ snd x)) ports
 
 
-unmapPorts :: IPv4 -> [ (Int,Int) ] -> IO ()
+unmapPorts :: IPv4 -> [ (Int,Port) ] -> IO ()
 unmapPorts addr ports = do
-    mapM_ (\x -> updateForwardRule "-D" addr (fst x) (snd x)) ports
+    mapM_ (\x -> updateForwardRule "-D" addr (fst x) (internalPort $ snd x)) ports
 
 
 updateForwardRule :: String -> IPv4 -> Int -> Int -> IO ()

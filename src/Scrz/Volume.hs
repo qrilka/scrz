@@ -31,6 +31,17 @@ allocateVolumes :: TVar Runtime -> Service -> IO [ BackingVolume ]
 allocateVolumes runtime service = do
     forM (serviceVolumes service) (allocateVolume runtime)
 
+releaseVolumes :: TVar Runtime -> [ BackingVolume ] -> IO ()
+releaseVolumes runtime bv = do
+    forM_ bv $ \backingVolume -> do
+        let id = backingVolumeId backingVolume
+        atomically $ modifyTVar runtime $ \x ->
+            x { backingVolumes = M.delete id (backingVolumes x) }
+
+        let path = baseVolumeDirectory ++ "/" ++ id
+        p <- exec "btrfs" [ "subvolume", "delete", path ]
+        wait p
+
 allocateVolume :: TVar Runtime -> Volume -> IO BackingVolume
 allocateVolume runtime volume = do
     case (volumeBacking volume) of

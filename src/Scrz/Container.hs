@@ -118,9 +118,11 @@ destroyContainer runtime container0 = do
     let ports   = containerPorts container
     let addr    = containerAddress container
 
-    --unmapPorts addr $ zip ports $ servicePorts service
+    unmapPorts addr $ zip ports $ servicePorts service
     mapM_ (releasePort runtime) ports
     releaseAddress runtime addr
+
+    releaseVolumes runtime (containerVolumes container)
 
 
  -- Delete resources from the filesystem.

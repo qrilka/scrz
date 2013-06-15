@@ -99,7 +99,7 @@ run [ "supervisor" ] = do
     atomically $ takeTMVar mvar
 
     rt <- atomically $ readTVar runtime
-    mapM_ (stopContainer runtime) $ M.elems (containers rt)
+    mapM_ (\x -> stopContainer runtime x >> destroyContainer runtime x) $ M.elems (containers rt)
 
     cleanupNetwork
 
