@@ -39,8 +39,6 @@ EOF
 cat >"$VOLUME/sbin/scrz-init" <<EOF
 #!/bin/sh
 set -e
-echo "127.0.0.1 \$FQDN \$(hostname) localhost" >/etc/hosts
-echo \$PORTMAP >/etc/portmap
 exec "\$@"
 EOF
 chmod +x "$VOLUME/sbin/scrz-init"
