@@ -48,6 +48,18 @@ createContainer runtime authority service = do
     writeFile lxcConfigPath $ lxcConfig id addr gatewayAddress rootfsPath
 
 
+ -- Update container config files (/etc/hosts, /etc/portmap, ...)
+    fqdn <- fullyQualifiedDomainName
+    let hostsLine = ["127.0.0.1", fromMaybe "" fqdn, id, "localhost" ]
+    writeFile (containerPath ++ "/rootfs/etc/hosts") $ intercalate " " hostsLine
+
+    let sports  = servicePorts service
+    let cports  = externalPorts
+    let ports   = zip sports cports
+    let portmap = map (\(int, ext) -> (show $ internalPort int) ++ "=" ++ (show ext)) ports
+    writeFile (containerPath ++ "/rootfs/etc/portmap") $ intercalate " " portmap
+
+
  -- Register the container in the runtime.
     container <- newTVarIO $ Container id authority service addr externalPorts backingVolumes Nothing
     atomically $ modifyTVar runtime $ \x ->
@@ -70,18 +82,7 @@ startContainer runtime container = do
         else do
             let args = ([ "-n", id, "-f", lxcConfigPath, "-c", "/dev/null", "/sbin/scrz-init" ]) ++ (serviceCommand service)
 
-            env0 <- getEnvironment
-            fqdn <- fullyQualifiedDomainName
-            let env1 = maybe env0 (\x -> ( "FQDN", x ) : env0) fqdn
-
-            let sports  = servicePorts $ containerService c
-            let cports  = containerPorts c
-            let ports   = zip sports cports
-            let portmap = map (\(int, ext) -> (show $ internalPort int) ++ "=" ++ (show ext)) ports
-            let env2    = ( "PORTMAP", intercalate " " portmap ) : env1
-
-
-            p <- execEnv "lxc-start" args env2
+            p <- execEnv "lxc-start" args []
             forkFinally (wait p) clearContainerProcess
 
             atomically $ modifyTVar container $ \x ->
