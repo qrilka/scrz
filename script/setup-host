@@ -1,0 +1,7 @@
+mount --make-rprivate /
+
+ip link add scrz type bridge
+ip addr add 10.1.0.1/24 dev scrz
+ip link set scrz up
+
+iptables -t nat -A POSTROUTING -s 10.1.0.1/24 ! -d 10.1.0.1/24 -j MASQUERADE

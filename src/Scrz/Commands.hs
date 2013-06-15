@@ -29,22 +29,46 @@ data Command
 
 
 instance FromJSON Service where
-    parseJSON (Object o) = fail "fail"
+    parseJSON (Object o) = Service
+        <$> o .: "revision"
+        <*> o .: "image"
+        <*> o .: "command"
+        <*> o .: "environment"
+        <*> o .: "ports"
+        <*> o .: "volumes"
+
 instance FromJSON Image where
-    parseJSON (Object o) = fail "fail"
+    parseJSON (Object o) = Image
+        <$> o .: "id"
+        <*> o .: "checksum"
+        <*> o .: "size"
+
 instance FromJSON Port where
-    parseJSON (Object o) = fail "fail"
+    parseJSON (Object o) = Port
+        <$> o .: "internal"
+        <*> o .: "external"
+
 instance FromJSON Volume where
-    parseJSON (Object o) = fail "fail"
+    parseJSON (Object o) = Volume
+        <$> o .: "path"
+        <*> o .: "backing"
+
+instance FromJSON Config where
+    parseJSON (Object o) = Config
+        <$> o .: "services"
 
 instance ToJSON Service where
     toJSON = undefined
+
 instance ToJSON Image where
     toJSON = undefined
+
 instance ToJSON Port where
     toJSON = undefined
+
 instance ToJSON Volume where
     toJSON = undefined
+
 
 instance FromJSON Command where
     parseJSON (Object o) = do

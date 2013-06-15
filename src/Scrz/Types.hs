@@ -14,7 +14,7 @@ data Image = Image
   { imageId :: String
   , imageChecksum :: String
   , imageSize :: Int
-  }
+  } deriving (Eq)
 
 
 data Port = Port
@@ -25,7 +25,7 @@ data Port = Port
   -- ^ If set, the container port is mapped to this specific external port.
   --   Since external ports have to be unique, only a single container can map
   --   to a specific port.
-  }
+  } deriving (Eq)
 
 
 data Volume = Volume
@@ -35,7 +35,7 @@ data Volume = Volume
   , volumeBacking :: Maybe String
   -- ^ ID of the backing volume if one should be reused. If Nothing, then the
   --   supervisor creates a new backing volume.
-  }
+  } deriving (Eq)
 
 
 data Service = Service
@@ -52,7 +52,7 @@ data Service = Service
     --   external network.
 
   , serviceVolumes :: [ Volume ]
-  }
+  } deriving (Eq)
 
 data Config = Config
   { configServices :: [ Service ]
@@ -95,4 +95,18 @@ data Runtime = Runtime
 
   , backingVolumes :: Map String BackingVolume
   , containers :: Map String (TVar Container)
+
+  , authorityServices :: [ Service ]
+  -- ^ Services that have been loaded from the authority.
+
+  , localServices :: [ Service ]
+  -- ^ Services that have been loaded from a local source (config file or
+  --   local management socket).
   }
+
+{--
+
+  Source: authority, local
+  Override: pin
+
+--}
