@@ -5,18 +5,15 @@ import Data.List (intercalate)
 import qualified Data.Map as M
 
 import System.Directory
-import System.Environment
 
 import Control.Applicative
 import Control.Monad
 
 import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TVar
 
 import Network.FQDN
 
-import Scrz.Log
 import Scrz.Types
 import Scrz.Utils
 import Scrz.Image
