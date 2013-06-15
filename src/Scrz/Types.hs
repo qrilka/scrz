@@ -1,12 +1,16 @@
 module Scrz.Types where
 
 
+import Data.Maybe (isJust)
+import Data.List as L
 import Data.Set (Set)
 import Data.Map (Map)
+import Data.Map as M
 import System.Process
 import Data.Word
 import Network.Socket
 import Control.Concurrent
+import Control.Concurrent.STM
 import Control.Concurrent.STM.TVar
 
 
@@ -63,9 +67,13 @@ data BackingVolume = BackingVolume
   }
 
 
+data Authority = Local | Remote String
+    deriving (Eq)
+
 data Container = Container
   { containerId :: String
 
+  , containerAuthority :: Authority
   , containerService :: Service
     -- ^ The service description as received from the authority server.
 
@@ -79,6 +87,10 @@ data Container = Container
   , containerProcess :: Maybe ProcessHandle
     -- ^ The process (lxc-start) which runs the container.
   }
+
+implementsService :: Authority -> Service -> Container -> Bool
+implementsService authority service container =
+    (containerAuthority container) == authority && (containerService container) == service
 
 
 data IPv4 = IPv4 Word32 deriving (Eq, Ord)
@@ -95,18 +107,12 @@ data Runtime = Runtime
 
   , backingVolumes :: Map String BackingVolume
   , containers :: Map String (TVar Container)
-
-  , authorityServices :: [ Service ]
-  -- ^ Services that have been loaded from the authority.
-
-  , localServices :: [ Service ]
-  -- ^ Services that have been loaded from a local source (config file or
-  --   local management socket).
   }
 
-{--
 
-  Source: authority, local
-  Override: pin
-
---}
+-- | Return true if the runtime has a container running that implements the
+--   service.
+hasContainer :: Runtime -> Authority -> Service -> IO Bool
+hasContainer runtime authority service = do
+    cs <- mapM (atomically . readTVar) (M.elems $ containers runtime)
+    return $ isJust $ L.find (implementsService authority service) cs

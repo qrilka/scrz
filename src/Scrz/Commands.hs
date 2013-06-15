@@ -158,7 +158,7 @@ processCommand runtime (CreateContainer service) = do
     logger $ "Creating container " ++ (show $ serviceRevision service)
 
     rt <- atomically $ readTVar runtime
-    container <- createContainer runtime service
+    container <- createContainer runtime Local service
     startContainer runtime container
     id <- atomically $ containerId <$> readTVar container
     return $ CreateContainerResponse id

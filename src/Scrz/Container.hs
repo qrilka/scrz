@@ -24,8 +24,8 @@ import Scrz.LXC
 import Scrz.Network
 
 
-createContainer :: TVar Runtime -> Service -> IO (TVar Container)
-createContainer runtime service = do
+createContainer :: TVar Runtime -> Authority -> Service -> IO (TVar Container)
+createContainer runtime authority service = do
     id <- newId
 
 
@@ -47,7 +47,7 @@ createContainer runtime service = do
 
 
  -- Register the container in the runtime.
-    container <- newTVarIO $ Container id service addr ports [] Nothing
+    container <- newTVarIO $ Container id authority service addr ports [] Nothing
     atomically $ modifyTVar runtime $ \x ->
         x { containers = M.insert id container (containers x) }
 

@@ -1,6 +1,8 @@
 module Main where
 
+import Data.Maybe (isJust)
 import qualified Data.Map as M
+import qualified Data.List as L
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as LBS
 
@@ -30,44 +32,43 @@ import Scrz.Commands
 
 createControlThread :: TMVar () -> TVar Runtime -> IO ThreadId
 createControlThread mvar runtime = do
-    --socket <- serverSocket
-    --forkFinally (forever $ handleClient runtime socket) (cleanup socket)
+    forkIO $ forever $ loadLocalConfig >> threadDelay delay
 
-    forkFinally (forever $ loadLocalConfig) (const $ atomically $ putTMVar mvar ())
+    socket <- serverSocket
+    forkFinally (forever $ handleClient runtime socket) (cleanup socket)
+
 
   where
+
+    delay = 10 * 1000 * 1000
 
     cleanup socket = const $ do
         close socket
         removeFile controlSocketPath
         atomically $ putTMVar mvar ()
 
-    hasService runtime service = elem service (localServices runtime)
-
     addService :: Service -> IO ()
     addService service = do
         rt <- atomically $ readTVar runtime
-        if hasService rt service
+        exists <- hasContainer rt Local service
+
+        if exists
             then return ()
             else do
-                atomically $ modifyTVar runtime $ \x ->
-                    x { localServices = service : (localServices x) }
-
-                container <- createContainer runtime service
+                container <- createContainer runtime Local service
                 startContainer runtime container
                 id <- atomically $ containerId <$> readTVar container
-                putStrLn $ show id
+                logger $ show id
 
     loadLocalConfig = do
-        putStrLn "Loading config file"
         conf <- LBS.readFile "conf.json"
 
         case A.decode conf :: Maybe Config of
             Nothing -> do
-                putStrLn "unable to decode"
+                logger "Unable to decode local config file"
                 threadDelay 10000000
             Just conf -> do
-                putStrLn "decoded"
+                logger "Loading from local config file"
                 forM (configServices conf) addService
                 threadDelay 10000000
 
@@ -82,8 +83,6 @@ initializeRuntime = do
       , networkPorts      = networkPorts
       , backingVolumes    = M.empty
       , containers        = M.empty
-      , authorityServices = []
-      , localServices     = []
       }
 
 
