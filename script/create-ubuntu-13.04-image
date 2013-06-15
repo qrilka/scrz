@@ -18,15 +18,7 @@ MIRROR="http://mirror.switch.ch/ftp/mirror/ubuntu"
 
 test -d "$(dirname "$VOLUME")" || mkdir -p "$(dirname "$VOLUME")"
 btrfs subvol create "$VOLUME"
-debootstrap --arch=amd64 --include=apt --verbose "$RELEASE" "$VOLUME" "$MIRROR"
-
-echo "root:root" | chroot $VOLUME /usr/sbin/chpasswd
-#chroot $VOLUME <<EOF
-#apt-get install localepurge
-#apt-get autoremove
-#apt-get clean
-#rm -rf /var/lib/apt/lists/*
-#EOF
+debootstrap --arch=amd64 --include=apt "$RELEASE" "$VOLUME" "$MIRROR"
 
 cat > "$VOLUME/etc/apt/sources.list" <<EOF
 deb $MIRROR  $RELEASE           main restricted universe
@@ -48,3 +40,15 @@ set -e
 exec "\$@"
 EOF
 chmod +x "$VOLUME/sbin/scrz-init"
+
+# Because Arch Linux doesn't have /sbin:/bin in PATH, but Ubuntu requires it.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+echo "root:root" | chroot $VOLUME chpasswd
+
+DEBIAN_FRONTEND=noninteractive chroot $VOLUME <<EOF
+apt-get -q -y autoremove
+apt-get -q -y clean
+rm -rf /var/lib/apt/lists/*
+EOF
