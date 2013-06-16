@@ -131,4 +131,5 @@ run args = do
     logger $ "Unknown arguments: " ++ (show args)
 
 
+main :: IO ()
 main = getArgs >>= run

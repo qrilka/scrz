@@ -1,16 +1,22 @@
 module Scrz.Image where
 
+import qualified Data.ByteString.Lazy as BS
 import           Data.Map (Map)
 import qualified Data.Map as M
 
 import System.Directory
+
+import Control.Monad
 import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TVar
 
+import           Network.Curl
+
 import Scrz.Types
 import Scrz.Utils
+import Scrz.Log
 
 
 baseImageDirectory = "/srv/scrz/images"
@@ -51,3 +57,46 @@ snapshotContainerImage container image = do
 
     imagePath  = "/srv/scrz/images/" ++ image
     volumePath = imagePath ++ "/volume"
+
+
+imageUrl authority image =
+    "http://localhost:3000/api/images/" ++ (imageId image) ++ "/content"
+
+
+ensureImage :: Authority -> Image -> IO ()
+ensureImage authority image = do
+    let imageFileName = "/srv/scrz/images/" ++ (imageId image) ++ "/content"
+    exists <- doesFileExist imageFileName
+    unless exists (downloadImage authority image)
+
+
+downloadImage :: Authority -> Image -> IO ()
+downloadImage authority image = do
+    let url = imageUrl authority image
+    logger $ "Downloading slug from " ++ url
+
+    (code, stream) <- curlGetString_ url curlOptions
+    case code of
+        CurlOK -> do
+            let imageFileName = "/srv/scrz/images/" ++ (imageId image) ++ "/content"
+            createDirectoryIfMissing True $ "/srv/scrz/images/" ++ (imageId image)
+            BS.writeFile imageFileName stream
+            unpackImage image
+
+        otherwise -> do
+            logger $ "Failed to download the slug: " ++ (show code)
+            return ()
+
+  where
+
+    curlOptions = [ CurlPost False, CurlNoBody False, CurlFollowLocation True ]
+
+unpackImage :: Image -> IO ()
+unpackImage image = do
+    fatal =<< exec "btrfs" [ "subvolume", "create", imageVolumePath ]
+    fatal =<< exec "tar" [ "-xf", imageFileName, "-C", imageVolumePath ]
+
+  where
+
+    imageVolumePath = "/srv/scrz/images/" ++ (imageId image) ++ "/volume"
+    imageFileName   = "/srv/scrz/images/" ++ (imageId image) ++ "/content"

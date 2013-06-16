@@ -27,6 +27,10 @@ createContainer runtime authority service = do
     id <- newId
 
 
+ -- Make sure the image is downloaded and ready to use.
+    ensureImage authority (serviceImage service)
+
+
  -- Allocate runtime resources (address, ports, volumes etc).
     addr <- allocateAddress runtime
     externalPorts <- forM (servicePorts service) (allocatePort runtime)
