@@ -11,6 +11,7 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TVar
 import qualified Data.Foldable as F
+import System.IO
 
 import Scrz.Log
 import Scrz.Types
@@ -26,6 +27,7 @@ data Command
   | Start String
   | DestroyContainer String
   | Snapshot String String
+  | Run String [String] String
 
 
 instance FromJSON Service where
@@ -85,6 +87,7 @@ instance FromJSON Command where
         parseCommand "destroy-container" o = DestroyContainer <$> (o .: "id")
         parseCommand "snapshot" o = Snapshot <$> (o .: "container") <*> (o .: "image")
         parseCommand "start" o = Start <$> (o .: "id")
+        parseCommand "run" o = Run <$> (o .: "image") <*> (o .: "cmd") <*> (o .: "pts")
         parseCommand _ _ = fail "Command"
 
 
@@ -116,6 +119,10 @@ instance ToJSON Command where
     toJSON (Start id) =
         let command = "start" :: String
         in object ["command" .= command, "id" .= id]
+
+    toJSON (Run image cmd pts) =
+        let command = "run" :: String
+        in object ["command" .= command, "image" .= image, "cmd" .= cmd, "pts" .= pts]
 
 data Response
   = EmptyResponse
@@ -159,7 +166,7 @@ processCommand runtime (CreateContainer service) = do
 
     rt <- atomically $ readTVar runtime
     container <- createContainer runtime Local service
-    startContainer runtime container
+    startContainer runtime container Nothing
     id <- atomically $ containerId <$> readTVar container
     return $ CreateContainerResponse id
 
@@ -212,8 +219,24 @@ processCommand runtime (Start id) = do
     case M.lookup id (containers rt) of
         Nothing -> return EmptyResponse
         Just container -> do
-            startContainer runtime container
+            startContainer runtime container Nothing
             return EmptyResponse
+
+processCommand runtime (Run image command pts) = do
+    handle <- openFile pts ReadWriteMode
+    let service = Service { serviceRevision = 0
+      , serviceImage = Image image "" 0
+      , serviceCommand = command
+      , serviceEnvironment = []
+      , servicePorts = []
+      , serviceVolumes = []
+      }
+
+    rt <- atomically $ readTVar runtime
+    container <- createContainer runtime Local service
+    startContainer runtime container (Just handle)
+    id <- atomically $ containerId <$> readTVar container
+    return $ EmptyResponse
 
 
 printResponse :: Response -> IO ()

@@ -5,6 +5,7 @@ import Data.List (intercalate)
 import qualified Data.Map as M
 
 import System.Directory
+import System.IO
 
 import Control.Applicative
 import Control.Monad
@@ -69,8 +70,8 @@ createContainer runtime authority service = do
     return container
 
 
-startContainer :: TVar Runtime -> TVar Container -> IO ()
-startContainer runtime container = do
+startContainer :: TVar Runtime -> TVar Container -> Maybe Handle -> IO ()
+startContainer runtime container mbHandle = do
     c <- atomically $ readTVar container
 
     let id            = containerId c
@@ -83,7 +84,7 @@ startContainer runtime container = do
         else do
             let args = ([ "-n", id, "-f", lxcConfigPath, "-c", "/dev/null", "/sbin/scrz-init" ]) ++ (serviceCommand service)
 
-            p <- execEnv "lxc-start" args []
+            p <- execEnv "lxc-start" args [] mbHandle
             forkFinally (wait p) clearContainerProcess
 
             atomically $ modifyTVar container $ \x ->

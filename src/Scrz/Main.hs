@@ -11,6 +11,10 @@ import Control.Monad
 import System.Environment
 import System.Directory
 import System.Posix.Process
+import System.Posix.Files
+import System.Posix.IO
+import System.Posix.Terminal (openPseudoTerminal, getSlaveTerminalName)
+import System.IO
 
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -56,7 +60,7 @@ createControlThread mvar runtime = do
             then return ()
             else do
                 container <- createContainer runtime Local service
-                startContainer runtime container
+                startContainer runtime container Nothing
                 id <- atomically $ containerId <$> readTVar container
                 logger $ show id
 
@@ -126,6 +130,27 @@ run [ "quit" ] = do
 
 run [ "console", id ] = do
     executeFile "lxc-console" True [ "-n", id ] Nothing
+
+run ("run":image:command) = do
+    (ptm, pts) <- openPseudoTerminal
+    slaveName <- getSlaveTerminalName ptm
+    setFdMode pts 0666
+    sendCommand $ Run image command slaveName
+
+    -- TODO: Handle ^C or when the slave exits (fdRead ptm should throw an
+    -- exception in that case).
+
+    mvar <- newEmptyTMVarIO
+    let pump src dst = fdRead src 999 >>= \(x, _) -> fdWrite dst x
+
+    forkFinally (forever $ pump ptm stdOutput) (const $ atomically $ putTMVar mvar ())
+    forkFinally (forever $ pump stdInput ptm)  (const $ atomically $ putTMVar mvar ())
+
+    putStrLn "Waiting on exit"
+    atomically $ takeTMVar mvar
+    putStrLn "exited"
+    return ()
+
 
 run args = do
     logger $ "Unknown arguments: " ++ (show args)

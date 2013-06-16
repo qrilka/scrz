@@ -1,9 +1,11 @@
 module Scrz.Utils where
 
 import Data.Char
+import Data.Maybe
 import Control.Monad.Random
 
 import System.Process
+import System.IO
 import System.Exit
 
 newId :: IO String
@@ -17,9 +19,10 @@ exec cmd args = do
     (_, _, _, p) <- createProcess (proc cmd args)
     return p
 
-execEnv :: String -> [ String ] -> [ (String,String) ] -> IO ProcessHandle
-execEnv cmd args env = do
-    (_, _, _, p) <- createProcess $ (proc cmd args) { env = Just env }
+execEnv :: String -> [ String ] -> [ (String,String) ] -> Maybe Handle -> IO ProcessHandle
+execEnv cmd args env mbHandle = do
+    let stream = maybe Inherit UseHandle mbHandle
+    (_, _, _, p) <- createProcess $ (proc cmd args) { env = Just env, std_in = stream, std_out = stream, std_err = stream }
     return p
 
 wait :: ProcessHandle -> IO ()
