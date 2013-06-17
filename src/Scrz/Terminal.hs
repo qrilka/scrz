@@ -3,24 +3,33 @@ module Scrz.Terminal where
 import System.IO
 import System.Posix.Terminal
 import System.Posix.IO
+import System.Posix.Types
 
+
+setRawModeFd :: Fd -> IO TerminalAttributes
+setRawModeFd fd = do
+    attr <- getTerminalAttributes fd
+    let rawAttr = makeRaw attr
+    setTerminalAttributes fd rawAttr Immediately
+    return attr
 
 setRawMode :: Handle -> IO (TerminalAttributes, Handle)
 setRawMode handle = do
     fd <- handleToFd handle
     isatty <- queryTerminal fd
     putStrLn $ "isatty = " ++ (show isatty)
-    attr <- getTerminalAttributes fd
-    let rawAttr = makeRaw attr
-    setTerminalAttributes fd rawAttr Immediately
+    attr <- setRawModeFd fd
 
     handle1 <- fdToHandle fd
     return (attr, handle1)
 
+resetModeFd :: Fd -> TerminalAttributes -> IO ()
+resetModeFd fd attrs = setTerminalAttributes fd attrs Immediately
+
 resetMode :: Handle -> TerminalAttributes -> IO Handle
 resetMode handle attrs = do
     fd <- handleToFd handle
-    setTerminalAttributes fd attrs Immediately
+    resetModeFd fd attrs
     fdToHandle fd
 
 -- cfmakeraw() clears these flags:

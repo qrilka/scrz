@@ -1,10 +1,11 @@
 module Scrz.LXC where
 
+import Data.List
 import Scrz.Types
-import Scrz.Network.IPv4
+import Scrz.Network.IPv4 ()
 
-lxcConfig :: String -> IPv4 -> IPv4 -> String -> String
-lxcConfig hostname addr gatewayAddress rootfsPath = unlines
+lxcConfig :: String -> IPv4 -> IPv4 -> String -> [(BackingVolume,Volume)] -> String
+lxcConfig hostname addr gatewayAddress rootfsPath volumes = unlines $
   [ "lxc.network.type   = veth"
   , "lxc.network.flags  = up"
   , "lxc.network.link   = scrz"
@@ -56,4 +57,17 @@ lxcConfig hostname addr gatewayAddress rootfsPath = unlines
   , ""
   , "lxc.cgroup.devices.allow = c 136:* rwm   # /dev/{0,1,2,3,4}"
   , "lxc.cgroup.devices.allow = c 254:0 rwm   # /dev/rtc0"
-  ]
+  ] ++ mountEntries rootfsPath volumes
+
+mountEntries :: String -> [(BackingVolume,Volume)] -> [String]
+mountEntries rootfsPath = map toMountEntry
+  where
+    toMountEntry (backingVolume, volume) = intercalate " "
+        [ "lxc.mount.entry ="
+        , "/srv/scrz/volumes/" ++ (backingVolumeId backingVolume)
+        , rootfsPath ++ "/" ++ (volumePath volume)
+        , "bind"
+        , "defaults,bind"
+        , "0"
+        , "0"
+        ]

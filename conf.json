@@ -23,7 +23,7 @@
             "volumes": [
                 {
                     "backing": null,
-                    "path": "/var/lib/redis"
+                    "path": "/srv"
                 }
             ]
         },

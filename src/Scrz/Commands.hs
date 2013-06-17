@@ -31,6 +31,7 @@ data Command
   | DestroyContainer String
   | Snapshot String String
   | Run String [String] String
+  | Wait String
 
 
 instance FromJSON Service where
@@ -91,6 +92,7 @@ instance FromJSON Command where
         parseCommand "snapshot" o = Snapshot <$> (o .: "container") <*> (o .: "image")
         parseCommand "start" o = Start <$> (o .: "id")
         parseCommand "run" o = Run <$> (o .: "image") <*> (o .: "cmd") <*> (o .: "pts")
+        parseCommand "wait" o = Wait <$> (o .: "id")
         parseCommand _ _ = fail "Command"
 
 
@@ -126,6 +128,10 @@ instance ToJSON Command where
     toJSON (Run image cmd pts) =
         let command = "run" :: String
         in object ["command" .= command, "image" .= image, "cmd" .= cmd, "pts" .= pts]
+
+    toJSON (Wait id) =
+        let command = "wait" :: String
+        in object ["command" .= command, "id" .= id]
 
 data Response
   = EmptyResponse
@@ -245,6 +251,20 @@ processCommand runtime (Run image command pts) = do
     id <- atomically $ containerId <$> readTVar container
     return $ CreateContainerResponse id
 
+processCommand runtime (Wait id) = do
+    rt <- atomically $ readTVar runtime
+    case M.lookup id (containers rt) of
+        Nothing -> return EmptyResponse
+        Just container -> do
+            logger $ "Waiting until container " ++ id ++ " shuts down"
+            atomically $ do
+                ct <- readTVar container
+                if isJust $ containerProcess ct
+                    then retry
+                    else return ()
+
+            logger $ "Container " ++ id ++ " has shut down"
+            return EmptyResponse
 
 
 printResponse :: Response -> IO ()

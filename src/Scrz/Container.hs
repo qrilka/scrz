@@ -21,6 +21,7 @@ import Scrz.Image
 import Scrz.LXC
 import Scrz.Network
 import Scrz.Volume
+import Scrz.Log
 
 
 createContainer :: TVar Runtime -> Authority -> Service -> IO (TVar Container)
@@ -47,7 +48,15 @@ createContainer runtime authority service = do
 
     createDirectoryIfMissing True containerPath
     cloneImage (serviceImage service) rootfsPath
-    writeFile lxcConfigPath $ lxcConfig id addr gatewayAddress rootfsPath
+
+    let volumes = zip backingVolumes (serviceVolumes service)
+    writeFile lxcConfigPath $ lxcConfig id addr gatewayAddress rootfsPath volumes
+
+
+ -- Create directories for the mount points
+    forM_ (serviceVolumes service) $ \volume -> do
+        let mountPoint = "/srv/scrz/containers/" ++ id ++ "/rootfs" ++ (volumePath volume)
+        createDirectoryIfMissing True mountPoint
 
 
  -- Update container config files (/etc/hosts, /etc/portmap, ...)
@@ -85,14 +94,19 @@ startContainer runtime container mbHandle = do
             let args = ([ "-n", id, "-f", lxcConfigPath, "-c", "/dev/null", "/sbin/scrz-init" ]) ++ (serviceCommand service)
 
             p <- execEnv "lxc-start" args [] mbHandle
-            forkFinally (wait p) clearContainerProcess
+            forkFinally (wait p) (clearContainerProcess mbHandle)
 
             atomically $ modifyTVar container $ \x ->
                 x { containerProcess = Just p }
 
   where
 
-    clearContainerProcess = const $ atomically $ modifyTVar container $ \x ->
+    clearContainerProcess mbHandle = const $ do
+        logger "lxc-start exited"
+        when (isJust mbHandle) $ do
+            logger "Closing slave handle"
+            hClose (fromJust mbHandle)
+        atomically $ modifyTVar container $ \x ->
             x { containerProcess = Nothing }
 
 

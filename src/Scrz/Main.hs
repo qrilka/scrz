@@ -146,24 +146,27 @@ run ("run":image:command) = do
     slaveName <- getSlaveTerminalName ptm
     response <- sendCommand $ Run image command slaveName
 
-    --(attr1, _) <- setRawMode stdin
-    --(attr2, _) <- setRawMode stdout
+    attr1 <- setRawModeFd stdInput
 
-    -- TODO: Handle ^C or when the slave exits (fdRead ptm should throw an
-    -- exception in that case).
-
-    mvar <- newEmptyTMVarIO
     let pump src dst = fdRead src 999 >>= \(x, _) -> fdWrite dst x
 
-    forkFinally (forever $ pump ptm stdOutput) (const $ atomically $ putTMVar mvar ())
-    forkFinally (forever $ pump stdInput ptm)  (const $ atomically $ putTMVar mvar ())
+    forkIO $ forever $ pump ptm stdOutput
+    forkIO $ forever $ pump stdInput ptm
 
     putStrLn "Waiting on exit"
-    atomically $ takeTMVar mvar
-    putStrLn "exited"
 
-    --resetMode stdin attr1
-    --resetMode stdout attr2
+    case response of
+        Just x -> do
+            case x of 
+                CreateContainerResponse id -> do
+                    sendCommand $ Wait id
+                    return ()
+
+                _ -> return ()
+        _ -> return ()
+
+    putStrLn "exited"
+    resetModeFd stdInput attr1
 
     case response of
         Just x -> do
