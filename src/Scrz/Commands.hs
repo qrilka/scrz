@@ -12,11 +12,14 @@ import Control.Concurrent.STM
 import Control.Concurrent.STM.TVar
 import qualified Data.Foldable as F
 import System.IO
+import System.Posix.Terminal (TerminalAttributes, getTerminalAttributes, TerminalMode(..), withoutMode, TerminalState(..), setTerminalAttributes, withBits)
+import System.Posix.IO (handleToFd, fdToHandle)
 
 import Scrz.Log
 import Scrz.Types
 import Scrz.Container
 import Scrz.Image
+import Scrz.Terminal
 
 
 data Command
@@ -222,8 +225,12 @@ processCommand runtime (Start id) = do
             startContainer runtime container Nothing
             return EmptyResponse
 
+
 processCommand runtime (Run image command pts) = do
     handle <- openFile pts ReadWriteMode
+    --(_, handle1) <- setRawMode handle
+    let handle1 = handle
+
     let service = Service { serviceRevision = 0
       , serviceImage = Image image "" 0
       , serviceCommand = command
@@ -234,9 +241,10 @@ processCommand runtime (Run image command pts) = do
 
     rt <- atomically $ readTVar runtime
     container <- createContainer runtime Local service
-    startContainer runtime container (Just handle)
+    startContainer runtime container (Just handle1)
     id <- atomically $ containerId <$> readTVar container
-    return $ EmptyResponse
+    return $ CreateContainerResponse id
+
 
 
 printResponse :: Response -> IO ()

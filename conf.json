@@ -1,0 +1,56 @@
+{
+    "fqdn": "host.domain.tld",
+    "id": 1,
+    "services": [
+        {
+            "command": [
+                "/sbin/init"
+            ],
+            "environment": [],
+            "id": 1,
+            "image": {
+                "checksum": "1234",
+                "id": "ubuntu-13.04-64bit",
+                "size": 25245
+            },
+            "ports": [
+                {
+                    "external": null,
+                    "internal": 3000
+                }
+            ],
+            "revision": 1,
+            "volumes": [
+                {
+                    "backing": null,
+                    "path": "/var/lib/redis"
+                }
+            ]
+        },
+        {
+            "command": [
+                "/sbin/init"
+            ],
+            "environment": [],
+            "id": 2,
+            "image": {
+                "checksum": "1234",
+                "id": "ubuntu-13.04-64bit",
+                "size": 25245
+            },
+            "ports": [
+                {
+                    "external": null,
+                    "internal": 3000
+                }
+            ],
+            "revision": 2,
+            "volumes": [
+                {
+                    "backing": null,
+                    "path": "/var/lib/redis"
+                }
+            ]
+        }
+    ]
+}

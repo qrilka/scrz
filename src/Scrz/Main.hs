@@ -16,6 +16,7 @@ import System.Posix.IO
 import System.Posix.Terminal (openPseudoTerminal, getSlaveTerminalName)
 import System.IO
 
+import Control.Exception
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TVar
@@ -32,6 +33,7 @@ import Scrz.Service
 import Scrz.Socket
 import Scrz.Signal
 import Scrz.Commands
+import Scrz.Terminal
 
 
 createControlThread :: TMVar () -> TVar Runtime -> IO ThreadId
@@ -46,7 +48,9 @@ createControlThread mvar runtime = do
 
     delay = 10 * 1000 * 1000
 
-    cleanup socket = const $ do
+    cleanup :: Socket -> Either SomeException () -> IO ()
+    cleanup socket ex = do
+        putStrLn $ show ex
         close socket
         removeFile controlSocketPath
         atomically $ putTMVar mvar ()
@@ -112,21 +116,27 @@ run [ "create-container", name, image ] = undefined
 
 run [ "list-containers" ] = do
     sendCommand $ ListContainers
+    return ()
 
 run [ "stop-container", id ] = do
     sendCommand $ StopContainer id
+    return ()
 
 run [ "destroy-container", id ] = do
     sendCommand $ DestroyContainer id
+    return ()
 
 run [ "start", id ] = do
     sendCommand $ Start id
+    return ()
 
 run [ "snapshot", container, image ] = do
     sendCommand $ Snapshot container image
+    return ()
 
 run [ "quit" ] = do
     sendCommand $ Quit
+    return ()
 
 run [ "console", id ] = do
     executeFile "lxc-console" True [ "-n", id ] Nothing
@@ -134,8 +144,10 @@ run [ "console", id ] = do
 run ("run":image:command) = do
     (ptm, pts) <- openPseudoTerminal
     slaveName <- getSlaveTerminalName ptm
-    setFdMode pts 0666
-    sendCommand $ Run image command slaveName
+    response <- sendCommand $ Run image command slaveName
+
+    --(attr1, _) <- setRawMode stdin
+    --(attr2, _) <- setRawMode stdout
 
     -- TODO: Handle ^C or when the slave exits (fdRead ptm should throw an
     -- exception in that case).
@@ -149,7 +161,19 @@ run ("run":image:command) = do
     putStrLn "Waiting on exit"
     atomically $ takeTMVar mvar
     putStrLn "exited"
-    return ()
+
+    --resetMode stdin attr1
+    --resetMode stdout attr2
+
+    case response of
+        Just x -> do
+            case x of 
+                CreateContainerResponse id -> do
+                    sendCommand $ DestroyContainer id
+                    return ()
+
+                _ -> return ()
+        _ -> return ()
 
 
 run args = do

@@ -55,12 +55,14 @@ clientSocket = do
 
     return sock
 
-sendCommand :: Command -> IO ()
+sendCommand :: Command -> IO (Maybe Response)
 sendCommand command = do
     socket <- clientSocket
 
     sendAll socket (encode command)
     response <- getContents socket
     case decode response of
-        Nothing -> return ()
-        Just response -> printResponse response
+        Nothing -> return Nothing
+        Just response -> do
+            printResponse response
+            return $ Just response
