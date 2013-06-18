@@ -151,10 +151,13 @@ run [ "pack-image", id ] = do
     image <- getImage id
     packImage image
 
-run ("run":image:command) = do
+run ("run":args) = do
+    let ra = parseRunArguments (RunArgs "" [] [] Nothing) args
+    putStrLn $ show ra
+
     (ptm, pts) <- openPseudoTerminal
     slaveName <- getSlaveTerminalName ptm
-    response <- sendCommand $ Run image command slaveName
+    response <- sendCommand $ Run (runArgsImage ra) (runArgsCommand ra) slaveName (runArgsMounts ra)
 
     attr1 <- setRawModeFd stdInput
 
@@ -167,7 +170,7 @@ run ("run":image:command) = do
         CreateContainerResponse id -> do
             sendCommand $ Wait id
             resetModeFd stdInput attr1
-            imageId <- newId
+            imageId <- maybe newId return (runArgsSaveAs ra)
             logger $ "Saving image under id " ++ imageId
             sendCommand $ Snapshot id imageId
             return ()
@@ -187,6 +190,28 @@ run ("run":image:command) = do
 run args = do
     logger $ "Unknown arguments: " ++ (show args)
 
+
+data RunArgs = RunArgs
+  { runArgsImage :: String
+  , runArgsCommand :: [String]
+  , runArgsMounts :: [(String,String)]
+  , runArgsSaveAs :: Maybe String
+  } deriving (Show)
+
+parseRunArguments :: RunArgs -> [String] -> RunArgs
+parseRunArguments ra [] = ra
+
+parseRunArguments ra ("--save-as" : id : args) =
+    let pra = ra { runArgsSaveAs = Just id }
+    in parseRunArguments pra args
+
+parseRunArguments ra ("--mount" : bv : mp : args) =
+    let pra = ra { runArgsMounts = (bv,mp) : runArgsMounts ra }
+    in parseRunArguments pra args
+
+parseRunArguments ra (image : command) = ra { runArgsImage = image, runArgsCommand = command }
+
+parseRunArguments _ _ = error "Unable to parse arguments"
 
 main :: IO ()
 main = getArgs >>= run

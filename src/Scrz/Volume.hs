@@ -31,26 +31,34 @@ allocateVolumes :: TVar Runtime -> Service -> IO [ BackingVolume ]
 allocateVolumes runtime service = do
     forM (serviceVolumes service) (allocateVolume runtime)
 
-releaseVolumes :: TVar Runtime -> [ BackingVolume ] -> IO ()
-releaseVolumes runtime bv = do
-    forM_ bv $ \backingVolume -> do
-        let id = backingVolumeId backingVolume
-        atomically $ modifyTVar runtime $ \x ->
-            x { backingVolumes = M.delete id (backingVolumes x) }
 
-        let path = baseVolumeDirectory ++ "/" ++ id
-        p <- exec "btrfs" [ "subvolume", "delete", path ]
-        wait p
+releaseVolumes :: TVar Runtime -> [ BackingVolume ] -> IO ()
+releaseVolumes runtime bv = forM_ bv (releaseVolume runtime)
+
+
+releaseVolume :: TVar Runtime -> BackingVolume -> IO ()
+releaseVolume runtime (AdHocVolume _) = return ()
+releaseVolume runtime (ManagedVolume id) = do
+    atomically $ modifyTVar runtime $ \x ->
+        x { backingVolumes = M.delete id (backingVolumes x) }
+
+    let path = baseVolumeDirectory ++ "/" ++ id
+    p <- exec "btrfs" [ "subvolume", "delete", path ]
+    wait p
+
 
 allocateVolume :: TVar Runtime -> Volume -> IO BackingVolume
 allocateVolume runtime volume = do
     case (volumeBacking volume) of
         Nothing -> createBackingVolume runtime
         Just x -> do
-            rt <- atomically $ readTVar runtime
-            case M.lookup x (backingVolumes rt) of
-                Nothing -> error $ "Backing volume not available"
-                Just b -> return b
+            if '/' == head x
+                then return $ AdHocVolume x
+                else do
+                    rt <- atomically $ readTVar runtime
+                    case M.lookup x (backingVolumes rt) of
+                        Nothing -> error $ "Backing volume not available"
+                        Just b -> return b
 
 
 createBackingVolume :: TVar Runtime -> IO BackingVolume
@@ -63,7 +71,7 @@ createBackingVolume runtime = do
     p <- exec "btrfs" [ "subvolume", "create", backingVolumePath ]
     fatal p
 
-    let ret = BackingVolume id
+    let ret = ManagedVolume id
     atomically $ modifyTVar runtime $ \x ->
         x { backingVolumes = M.insert id ret (backingVolumes x) }
 

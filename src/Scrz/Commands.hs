@@ -19,7 +19,6 @@ import Scrz.Log
 import Scrz.Types
 import Scrz.Container
 import Scrz.Image
-import Scrz.Terminal
 
 
 data Command
@@ -30,7 +29,7 @@ data Command
   | Start String
   | DestroyContainer String
   | Snapshot String String
-  | Run String [String] String
+  | Run String [String] String [(String, String)]
   | Wait String
 
 
@@ -91,7 +90,7 @@ instance FromJSON Command where
         parseCommand "destroy-container" o = DestroyContainer <$> (o .: "id")
         parseCommand "snapshot" o = Snapshot <$> (o .: "container") <*> (o .: "image")
         parseCommand "start" o = Start <$> (o .: "id")
-        parseCommand "run" o = Run <$> (o .: "image") <*> (o .: "cmd") <*> (o .: "pts")
+        parseCommand "run" o = Run <$> (o .: "image") <*> (o .: "cmd") <*> (o .: "pts") <*> (o .: "mounts")
         parseCommand "wait" o = Wait <$> (o .: "id")
         parseCommand _ _ = fail "Command"
 
@@ -125,9 +124,9 @@ instance ToJSON Command where
         let command = "start" :: String
         in object ["command" .= command, "id" .= id]
 
-    toJSON (Run image cmd pts) =
+    toJSON (Run image cmd pts mounts) =
         let command = "run" :: String
-        in object ["command" .= command, "image" .= image, "cmd" .= cmd, "pts" .= pts]
+        in object ["command" .= command, "image" .= image, "cmd" .= cmd, "pts" .= pts, "mounts" .= mounts]
 
     toJSON (Wait id) =
         let command = "wait" :: String
@@ -232,9 +231,8 @@ processCommand runtime (Start id) = do
             return EmptyResponse
 
 
-processCommand runtime (Run image command pts) = do
+processCommand runtime (Run image command pts mounts) = do
     handle <- openFile pts ReadWriteMode
-    --(_, handle1) <- setRawMode handle
     let handle1 = handle
 
     let service = Service { serviceRevision = 0
@@ -242,7 +240,7 @@ processCommand runtime (Run image command pts) = do
       , serviceCommand = command
       , serviceEnvironment = []
       , servicePorts = []
-      , serviceVolumes = []
+      , serviceVolumes = map (\(a,b) -> Volume a (Just b)) mounts
       }
 
     rt <- atomically $ readTVar runtime

@@ -62,9 +62,12 @@ data Config = Config
   { configServices :: [ Service ]
   }
 
-data BackingVolume = BackingVolume
+data BackingVolume = AdHocVolume String | ManagedVolume
   { backingVolumeId :: String
   }
+
+backingVolumePath (AdHocVolume path) = path
+backingVolumePath (ManagedVolume id) = "/srv/scrz/volumes/" ++ id
 
 
 data Authority = Local | Remote String

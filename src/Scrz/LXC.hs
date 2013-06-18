@@ -64,7 +64,7 @@ mountEntries rootfsPath = map toMountEntry
   where
     toMountEntry (backingVolume, volume) = intercalate " "
         [ "lxc.mount.entry ="
-        , "/srv/scrz/volumes/" ++ (backingVolumeId backingVolume)
+        , backingVolumePath backingVolume
         , rootfsPath ++ "/" ++ (volumePath volume)
         , "bind"
         , "defaults,bind"
