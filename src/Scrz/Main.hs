@@ -153,8 +153,6 @@ run ("run":image:command) = do
     forkIO $ forever $ pump ptm stdOutput
     forkIO $ forever $ pump stdInput ptm
 
-    putStrLn "Waiting on exit"
-
     case response of
         Just x -> do
             case x of 
@@ -165,7 +163,6 @@ run ("run":image:command) = do
                 _ -> return ()
         _ -> return ()
 
-    putStrLn "exited"
     resetModeFd stdInput attr1
 
     case response of
