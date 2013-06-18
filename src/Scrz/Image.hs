@@ -22,6 +22,14 @@ import Scrz.Log
 baseImageDirectory = "/srv/scrz/images"
 
 
+getImage :: String -> IO Image
+getImage id = do
+    images <- loadImages
+    case M.lookup id images of
+        Nothing -> error "Image not found"
+        Just x -> return x
+
+
 loadImages :: IO (Map String Image)
 loadImages = do
     images <- getDirectoryContents baseImageDirectory
@@ -95,6 +103,16 @@ unpackImage :: Image -> IO ()
 unpackImage image = do
     fatal =<< exec "btrfs" [ "subvolume", "create", imageVolumePath ]
     fatal =<< exec "tar" [ "-xf", imageFileName, "-C", imageVolumePath ]
+
+  where
+
+    imageVolumePath = "/srv/scrz/images/" ++ (imageId image) ++ "/volume"
+    imageFileName   = "/srv/scrz/images/" ++ (imageId image) ++ "/content"
+
+
+packImage :: Image -> IO ()
+packImage image = do
+    fatal =<< exec "tar" [ "-cJf", imageFileName, "-C", imageVolumePath, "." ]
 
   where
 

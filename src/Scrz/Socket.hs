@@ -55,14 +55,13 @@ clientSocket = do
 
     return sock
 
-sendCommand :: Command -> IO (Maybe Response)
+sendCommand :: Command -> IO Response
 sendCommand command = do
     socket <- clientSocket
 
     sendAll socket (encode command)
     response <- getContents socket
     case decode response of
-        Nothing -> return Nothing
+        Nothing -> error $ "Unable to parse response: " ++ show response
         Just response -> do
-            printResponse response
-            return $ Just response
+            return response

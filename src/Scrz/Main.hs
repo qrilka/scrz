@@ -34,6 +34,7 @@ import Scrz.Socket
 import Scrz.Signal
 import Scrz.Commands
 import Scrz.Terminal
+import Scrz.Utils
 
 
 createControlThread :: TMVar () -> TVar Runtime -> IO ThreadId
@@ -115,7 +116,7 @@ run [ "create-container", name, image ] = undefined
     --sendCommand $ CreateContainer name image
 
 run [ "list-containers" ] = do
-    sendCommand $ ListContainers
+    printResponse <$> sendCommand ListContainers
     return ()
 
 run [ "stop-container", id ] = do
@@ -141,6 +142,15 @@ run [ "quit" ] = do
 run [ "console", id ] = do
     executeFile "lxc-console" True [ "-n", id ] Nothing
 
+run [ "list-images" ] = do
+    images <- loadImages
+    forM_ (M.toList images) $ \(id, image) -> do
+        putStrLn $ imageId image
+
+run [ "pack-image", id ] = do
+    image <- getImage id
+    packImage image
+
 run ("run":image:command) = do
     (ptm, pts) <- openPseudoTerminal
     slaveName <- getSlaveTerminalName ptm
@@ -154,25 +164,23 @@ run ("run":image:command) = do
     forkIO $ forever $ pump stdInput ptm
 
     case response of
-        Just x -> do
-            case x of 
-                CreateContainerResponse id -> do
-                    sendCommand $ Wait id
-                    return ()
+        CreateContainerResponse id -> do
+            sendCommand $ Wait id
+            resetModeFd stdInput attr1
+            imageId <- newId
+            logger $ "Saving image under id " ++ imageId
+            sendCommand $ Snapshot id imageId
+            return ()
 
-                _ -> return ()
         _ -> return ()
 
-    resetModeFd stdInput attr1
+
 
     case response of
-        Just x -> do
-            case x of 
-                CreateContainerResponse id -> do
-                    sendCommand $ DestroyContainer id
-                    return ()
+        CreateContainerResponse id -> do
+            sendCommand $ DestroyContainer id
+            return ()
 
-                _ -> return ()
         _ -> return ()
 
 
