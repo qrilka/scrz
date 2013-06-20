@@ -70,14 +70,12 @@ createControlThread mvar runtime = do
                 logger $ show id
 
     loadLocalConfig = do
-        conf <- LBS.readFile "conf.json"
+        conf <- LBS.readFile "/etc/scrz/config.json"
 
         case A.decode conf :: Maybe Config of
             Nothing -> do
-                logger "Unable to decode local config file"
                 threadDelay 10000000
             Just conf -> do
-                logger "Loading from local config file"
                 forM (configServices conf) addService
                 threadDelay 10000000
 
