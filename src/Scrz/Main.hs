@@ -163,8 +163,8 @@ run ("run":args) = do
 
     let pump src dst = fdRead src 999 >>= \(x, _) -> fdWrite dst x
 
-    forkIO $ forever $ pump ptm stdOutput
-    forkIO $ forever $ pump stdInput ptm
+    forkFinally (forever $ pump ptm stdOutput) (const $ return ())
+    forkFinally (forever $ pump stdInput ptm)  (const $ return ())
 
     case response of
         CreateContainerResponse id -> do

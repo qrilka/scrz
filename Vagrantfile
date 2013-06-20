@@ -14,13 +14,15 @@ Vagrant.configure("2") do |config|
       debootstrap
 
     # Create btrfs filesystem inside a file, loop mount it to /srv/scrz
-    fallocate -l 20G /srv/scrz.img
-    losetup /dev/loop0 /srv/scrz.img
-    mkfs.btrfs /dev/loop0
-    losetup -d /dev/loop0
-    mkdir /srv/scrz
-    echo "/srv/scrz.img /srv/scrz btrfs loop 0 0" >> /etc/fstab
-    mount /srv/scrz
+    if ! test -d /srv/scrz; then
+      fallocate -l 20G /srv/scrz.img
+      losetup /dev/loop0 /srv/scrz.img
+      mkfs.btrfs /dev/loop0
+      losetup -d /dev/loop0
+      mkdir /srv/scrz
+      echo "/srv/scrz.img /srv/scrz btrfs loop 0 0" >> /etc/fstab
+      mount /srv/scrz
+    fi
   SCRIPT
 
 end

@@ -1,32 +1,35 @@
 module Scrz.Terminal where
 
+import Data.Maybe
+import Control.Monad
 import System.IO
 import System.Posix.Terminal
 import System.Posix.IO
 import System.Posix.Types
 
 
-setRawModeFd :: Fd -> IO TerminalAttributes
+setRawModeFd :: Fd -> IO (Maybe TerminalAttributes)
 setRawModeFd fd = do
-    attr <- getTerminalAttributes fd
-    let rawAttr = makeRaw attr
-    setTerminalAttributes fd rawAttr Immediately
-    return attr
+    isatty <- queryTerminal fd
+    if not isatty
+        then return Nothing
+        else do
+            attr <- getTerminalAttributes fd
+            setTerminalAttributes fd (makeRaw attr) Immediately
+            return $ Just attr
 
-setRawMode :: Handle -> IO (TerminalAttributes, Handle)
+setRawMode :: Handle -> IO (Maybe TerminalAttributes, Handle)
 setRawMode handle = do
     fd <- handleToFd handle
-    isatty <- queryTerminal fd
-    putStrLn $ "isatty = " ++ (show isatty)
     attr <- setRawModeFd fd
-
     handle1 <- fdToHandle fd
     return (attr, handle1)
 
-resetModeFd :: Fd -> TerminalAttributes -> IO ()
-resetModeFd fd attrs = setTerminalAttributes fd attrs Immediately
+resetModeFd :: Fd -> Maybe TerminalAttributes -> IO ()
+resetModeFd fd Nothing = return ()
+resetModeFd fd (Just attrs) = setTerminalAttributes fd attrs Immediately
 
-resetMode :: Handle -> TerminalAttributes -> IO Handle
+resetMode :: Handle -> Maybe TerminalAttributes -> IO Handle
 resetMode handle attrs = do
     fd <- handleToFd handle
     resetModeFd fd attrs
