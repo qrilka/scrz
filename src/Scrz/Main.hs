@@ -74,6 +74,7 @@ createControlThread mvar runtime = do
 
         case A.decode conf :: Maybe Config of
             Nothing -> do
+                putStrLn "Could not decode config"
                 threadDelay 10000000
             Just conf -> do
                 forM (configServices conf) addService
@@ -114,7 +115,7 @@ run [ "create-container", name, image ] = undefined
     --sendCommand $ CreateContainer name image
 
 run [ "list-containers" ] = do
-    printResponse <$> sendCommand ListContainers
+    sendCommand ListContainers >>= printResponse
     return ()
 
 run [ "stop-container", id ] = do

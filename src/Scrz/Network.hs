@@ -62,15 +62,19 @@ releaseAddress runtime addr = atomically $ do
 
 allocatePort :: TVar Runtime -> Port -> IO Int
 allocatePort runtime port = atomically $ do
-    rt <- readTVar runtime
-    let ports = networkPorts rt
-    let ext = fromMaybe (head $ S.toList ports) (externalPort port)
-    if S.member ext ports
-        then do
-            writeTVar runtime $ rt { networkPorts = S.delete ext ports }
-            return ext
-        else
-            error $ "Can not allocate external port " ++ (show $ externalPort port)
+    maybe randomFromSet return (externalPort port)
+
+  where
+    randomFromSet = do
+        rt <- readTVar runtime
+        let ports = networkPorts rt
+        let ext = fromMaybe (head $ S.toList ports) (externalPort port)
+        if S.member ext ports
+            then do
+                writeTVar runtime $ rt { networkPorts = S.delete ext ports }
+                return ext
+            else
+                error $ "Can not allocate external port " ++ (show $ externalPort port)
 
 releasePort :: TVar Runtime -> Int -> IO ()
 releasePort runtime port = atomically $ do
