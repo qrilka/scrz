@@ -49,7 +49,6 @@ Executable scrz
     Build-depends:  text        >= 0
     Build-depends:  time        >= 0
     Build-depends:  unix        >= 2.0
-    Build-depends:  curl        >= 0
 
     Hs-Source-Dirs: src
 

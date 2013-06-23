@@ -12,7 +12,7 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TVar
 
-import           Network.Curl
+--import           Network.Curl
 
 import Scrz.Types
 import Scrz.Utils
@@ -79,7 +79,10 @@ ensureImage authority image = do
 
 
 downloadImage :: Authority -> Image -> IO ()
-downloadImage authority image = do
+downloadImage authority image = return ()
+
+{- TODO: Replace with pure haskell http client
+
     let url = imageUrl authority image
     logger $ "Downloading slug from " ++ url
 
@@ -98,6 +101,7 @@ downloadImage authority image = do
   where
 
     curlOptions = [ CurlPost False, CurlNoBody False, CurlFollowLocation True ]
+-}
 
 unpackImage :: Image -> IO ()
 unpackImage image = do
