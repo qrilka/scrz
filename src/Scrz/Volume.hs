@@ -15,8 +15,6 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TVar
 
-import Network.FQDN
-
 import Scrz.Log
 import Scrz.Types
 import Scrz.Utils

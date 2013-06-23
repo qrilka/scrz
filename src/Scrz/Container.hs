@@ -13,8 +13,6 @@ import Control.Monad
 import Control.Concurrent
 import Control.Concurrent.STM
 
-import Network.FQDN
-
 import Scrz.Types
 import Scrz.Utils
 import Scrz.Image
@@ -22,6 +20,16 @@ import Scrz.LXC
 import Scrz.Network
 import Scrz.Volume
 import Scrz.Log
+
+import Network.BSD
+import Network.Socket
+import Control.Applicative
+
+fullyQualifiedDomainName :: IO (Maybe String)
+fullyQualifiedDomainName = do
+    hostName <- Just <$> getHostName
+    addrInfo <- head <$> getAddrInfo Nothing hostName Nothing
+    fst <$> getNameInfo [] True False (addrAddress addrInfo)
 
 
 createContainer :: TVar Runtime -> Authority -> Service -> IO (TVar Container)
