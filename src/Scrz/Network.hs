@@ -21,8 +21,8 @@ cleanupNetwork :: IO ()
 cleanupNetwork = do
     logger "Cleaning up iptables configuration"
 
-    iptables wait [ "-t", "nat", "-D", "PREROUTING", "-j", "SCRZ" ]
-    iptables wait [ "-t", "nat", "-D", "OUTPUT",     "-j", "SCRZ" ]
+    iptables wait [ "-t", "nat", "-D", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "SCRZ" ]
+    iptables wait [ "-t", "nat", "-D", "OUTPUT", "-j", "SCRZ" ]
 
     iptables wait [ "-t", "nat", "-F", "SCRZ" ]
     iptables wait [ "-t", "nat", "-X", "SCRZ" ]
@@ -36,8 +36,8 @@ initializeNetwork iface = do
     logger "Initializing iptables"
 
     iptables fatal [ "-t", "nat", "-N", "SCRZ" ]
-    iptables fatal [ "-t", "nat", "-A", "OUTPUT",     "-j", "SCRZ" ]
-    iptables fatal [ "-t", "nat", "-A", "PREROUTING", "-j", "SCRZ" ]
+    iptables fatal [ "-t", "nat", "-A", "OUTPUT", "-j", "SCRZ" ]
+    iptables fatal [ "-t", "nat", "-A", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "SCRZ" ]
 
     return $ ( toIPv4 [10,1,0,1], addresses,  ports )
 
