@@ -1,6 +1,5 @@
 module Main where
 
-import           Data.Maybe
 import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Aeson as A
@@ -32,14 +31,17 @@ import Scrz.Terminal
 import Scrz.Utils
 import Scrz.Http
 
+withMaybe :: Maybe a -> (a -> IO ()) -> IO ()
+withMaybe Nothing  f = return ()
+withMaybe (Just a) f = f a
 
 createControlThread :: TMVar () -> TVar Runtime -> Maybe String -> IO ThreadId
 createControlThread mvar runtime remoteAuthorityUrl = do
     forkIO $ forever $ loadLocalConfig  >> threadDelay delay
 
-    when (isJust remoteAuthorityUrl) $ do
+    withMaybe remoteAuthorityUrl $ \url -> do
         void $ forkIO $ forever $ do
-            syncRemoteConfig (fromJust remoteAuthorityUrl)
+            syncRemoteConfig url
             threadDelay delay
 
     socket <- serverSocket
