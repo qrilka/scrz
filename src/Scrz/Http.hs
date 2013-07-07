@@ -5,7 +5,6 @@ import           Data.Conduit
 import           Data.Conduit.Binary (sinkFile)
 
 import           Control.Applicative
-import           Control.Monad
 
 import           Network.HTTP.Conduit
 import           Network.HTTP.Types.Method
@@ -24,9 +23,9 @@ getJSON url = do
 
 
 downloadBinary :: String -> String -> IO ()
-downloadBinary url path = do
+downloadBinary url localPath = do
     req <- parseUrl url
     let req' = req { method = methodGet }
     withManager $ \manager -> do
         response <- http req' manager
-        responseBody response $$+- sinkFile path
+        responseBody response $$+- sinkFile localPath

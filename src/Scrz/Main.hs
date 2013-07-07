@@ -32,12 +32,12 @@ import Scrz.Utils
 import Scrz.Http
 
 withMaybe :: Maybe a -> (a -> IO ()) -> IO ()
-withMaybe Nothing  f = return ()
+withMaybe Nothing  _ = return ()
 withMaybe (Just a) f = f a
 
 createControlThread :: TMVar () -> TVar Runtime -> Maybe String -> IO ThreadId
 createControlThread mvar runtime remoteAuthorityUrl = do
-    forkIO $ forever $ loadLocalConfig  >> threadDelay delay
+    void $ forkIO $ forever $ loadLocalConfig  >> threadDelay delay
 
     withMaybe remoteAuthorityUrl $ \url -> do
         void $ forkIO $ forever $ do
@@ -66,9 +66,9 @@ createControlThread mvar runtime remoteAuthorityUrl = do
             Nothing -> putStrLn "Could not decode config"
             Just config -> mergeConfig runtime Local config
 
-    syncRemoteConfig remoteAuthorityUrl = do
-        let authority = Remote remoteAuthorityUrl
-        config <- getJSON $ remoteAuthorityUrl ++ "/api/conf?host=host.domain.tld"
+    syncRemoteConfig url = do
+        let authority = Remote url
+        config <- getJSON $ url ++ "/api/conf?host=host.domain.tld"
         case config of
             Nothing -> return ()
             Just x -> mergeConfig runtime authority x
@@ -86,7 +86,7 @@ mergeConfig runtime authority config = do
 
         when (matchAuthority && not hasService) $ do
             logger $ "Service removed from the configuration, stopping container"
-            stopContainer runtime container
+            stopContainer container
             destroyContainer runtime container
 
     -- Add new services from the authority.
@@ -101,14 +101,14 @@ mergeConfig runtime authority config = do
 
         unless exists $ do
             container <- createContainer runtime authority service
-            startContainer runtime container Nothing
+            startContainer container Nothing
             id <- atomically $ containerId <$> readTVar container
             logger $ show id
 
 
 initializeRuntime :: IO Runtime
 initializeRuntime = do
-    (bridgeAddress, networkAddresses, networkPorts) <- initializeNetwork "scrz"
+    (bridgeAddress, networkAddresses, networkPorts) <- initializeNetwork
 
     return $ Runtime
       { bridgeAddress     = bridgeAddress
@@ -131,7 +131,7 @@ startSupervisor remoteAuthorityUrl = do
     atomically $ takeTMVar mvar
 
     rt <- atomically $ readTVar runtime
-    mapM_ (\x -> stopContainer runtime x >> destroyContainer runtime x) $ M.elems (containers rt)
+    mapM_ (\x -> stopContainer x >> destroyContainer runtime x) $ M.elems (containers rt)
 
     cleanupNetwork
 
@@ -139,9 +139,6 @@ startSupervisor remoteAuthorityUrl = do
 run :: [ String ] -> IO ()
 run [ "supervisor" ] = startSupervisor Nothing
 run [ "supervisor", remoteAuthorityUrl ] = startSupervisor $ Just remoteAuthorityUrl
-
-run [ "create-container", name, image ] = undefined
-    --sendCommand $ CreateContainer name image
 
 run [ "list-containers" ] = do
     sendCommand ListContainers >>= printResponse

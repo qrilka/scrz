@@ -4,7 +4,6 @@ module Scrz.Types where
 import Data.Maybe (isJust)
 import Data.List as L
 import Data.Set (Set)
-import Data.Map (Map)
 import Data.Map as M
 import System.Process
 import Data.Word
@@ -63,8 +62,9 @@ data BackingVolume = AdHocVolume String | ManagedVolume
   { backingVolumeId :: String
   }
 
+backingVolumePath :: BackingVolume -> String
 backingVolumePath (AdHocVolume path) = path
-backingVolumePath (ManagedVolume id) = "/srv/scrz/volumes/" ++ id
+backingVolumePath (ManagedVolume vid) = "/srv/scrz/volumes/" ++ vid
 
 
 data Authority = Local | Remote String

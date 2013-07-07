@@ -1,7 +1,5 @@
 module Scrz.Terminal where
 
-import Data.Maybe
-import Control.Monad
 import System.IO
 import System.Posix.Terminal
 import System.Posix.IO
@@ -26,7 +24,7 @@ setRawMode handle = do
     return (attr, handle1)
 
 resetModeFd :: Fd -> Maybe TerminalAttributes -> IO ()
-resetModeFd fd Nothing = return ()
+resetModeFd _ Nothing = return ()
 resetModeFd fd (Just attrs) = setTerminalAttributes fd attrs Immediately
 
 resetMode :: Handle -> Maybe TerminalAttributes -> IO Handle

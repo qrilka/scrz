@@ -1,19 +1,14 @@
 module Scrz.Commands where
 
+import Prelude hiding (id)
 import qualified Data.Map as M
 import Data.Maybe
-import Data.List (intersperse, concat, transpose, intercalate)
+import Data.List (transpose, intercalate)
 import Data.Aeson
 import Data.Aeson.Types
-import qualified Data.ByteString.Lazy as L
 import Control.Applicative
-import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TVar
-import qualified Data.Foldable as F
 import System.IO
-import System.Posix.Terminal (TerminalAttributes, getTerminalAttributes, TerminalMode(..), withoutMode, TerminalState(..), setTerminalAttributes, withBits)
-import System.Posix.IO (handleToFd, fdToHandle)
 
 import Scrz.Log
 import Scrz.Types
@@ -85,22 +80,23 @@ instance ToJSON Volume where
 instance FromJSON Command where
     parseJSON (Object o) = do
         command <- o .: "command"
-        parseCommand command o
+        parseCommand command
 
       where
 
-        parseCommand :: String -> Object -> Parser Command
-        parseCommand "quit" o = return Quit
-        parseCommand "list-container" o = return ListContainers
-        parseCommand "stop-container" o = StopContainer <$> (o .: "id")
-        parseCommand "create-container" o = CreateContainer <$> (o .: "service")
-        parseCommand "destroy-container" o = DestroyContainer <$> (o .: "id")
-        parseCommand "snapshot" o = Snapshot <$> (o .: "container") <*> (o .: "image")
-        parseCommand "start" o = Start <$> (o .: "id")
-        parseCommand "run" o = Run <$> (o .: "image") <*> (o .: "cmd") <*> (o .: "pts") <*> (o .: "mounts")
-        parseCommand "wait" o = Wait <$> (o .: "id")
-        parseCommand _ _ = fail "Command"
+        parseCommand :: String -> Parser Command
+        parseCommand "quit" = return Quit
+        parseCommand "list-container" = return ListContainers
+        parseCommand "stop-container" = StopContainer <$> (o .: "id")
+        parseCommand "create-container" = CreateContainer <$> (o .: "service")
+        parseCommand "destroy-container" = DestroyContainer <$> (o .: "id")
+        parseCommand "snapshot" = Snapshot <$> (o .: "container") <*> (o .: "image")
+        parseCommand "start" = Start <$> (o .: "id")
+        parseCommand "run" = Run <$> (o .: "image") <*> (o .: "cmd") <*> (o .: "pts") <*> (o .: "mounts")
+        parseCommand "wait" = Wait <$> (o .: "id")
+        parseCommand _ = fail "Command"
 
+    parseJSON _ = fail "Command"
 
 instance ToJSON Command where
     toJSON Quit =
@@ -148,14 +144,17 @@ data Response
 instance FromJSON Response where
     parseJSON (Object o) = do
         response <- o .: "response"
-        parseResponse o response
+        parseResponse response
 
       where
 
-        parseResponse :: Object -> String -> Parser Response
-        parseResponse o "empty" = return EmptyResponse
-        parseResponse o "create-container" = CreateContainerResponse <$> (o .: "id")
-        parseResponse o "list-containers" = ListContainersResponse <$> (o .: "data")
+        parseResponse :: String -> Parser Response
+        parseResponse "empty" = return EmptyResponse
+        parseResponse "create-container" = CreateContainerResponse <$> (o .: "id")
+        parseResponse "list-containers" = ListContainersResponse <$> (o .: "data")
+        parseResponse _ = fail "Response"
+
+    parseJSON _ = fail "Response"
 
 instance ToJSON Response where
     toJSON EmptyResponse =
@@ -172,16 +171,15 @@ instance ToJSON Response where
 
 
 processCommand :: TVar Runtime -> Command -> IO Response
-processCommand runtime Quit = do
+processCommand _ Quit = do
     logger "Received <quit> command."
     error "exiting"
 
 processCommand runtime (CreateContainer service) = do
     logger $ "Creating container " ++ (show $ serviceRevision service)
 
-    rt <- atomically $ readTVar runtime
     container <- createContainer runtime Local service
-    startContainer runtime container Nothing
+    startContainer container Nothing
     id <- atomically $ containerId <$> readTVar container
     return $ CreateContainerResponse id
 
@@ -207,7 +205,7 @@ processCommand runtime (StopContainer id) = do
     case M.lookup id (containers rt) of
         Nothing -> return EmptyResponse
         Just container -> do
-            stopContainer runtime container
+            stopContainer container
             return EmptyResponse
 
 processCommand runtime (DestroyContainer id) = do
@@ -215,7 +213,7 @@ processCommand runtime (DestroyContainer id) = do
     case M.lookup id (containers rt) of
         Nothing -> return EmptyResponse
         Just container -> do
-            stopContainer runtime container
+            stopContainer container
             destroyContainer runtime container
             return EmptyResponse
 
@@ -224,7 +222,7 @@ processCommand runtime (Snapshot cid image) = do
     case M.lookup cid (containers rt) of
         Nothing -> return EmptyResponse
         Just container -> do
-            stopContainer runtime container
+            stopContainer container
             snapshotContainerImage container image
 
             return EmptyResponse
@@ -234,7 +232,7 @@ processCommand runtime (Start id) = do
     case M.lookup id (containers rt) of
         Nothing -> return EmptyResponse
         Just container -> do
-            startContainer runtime container Nothing
+            startContainer container Nothing
             return EmptyResponse
 
 
@@ -250,9 +248,8 @@ processCommand runtime (Run image command pts mounts) = do
       , serviceVolumes = map (\(a,b) -> Volume a (Just b)) mounts
       }
 
-    rt <- atomically $ readTVar runtime
     container <- createContainer runtime Local service
-    startContainer runtime container (Just handle1)
+    startContainer container (Just handle1)
     id <- atomically $ containerId <$> readTVar container
     return $ CreateContainerResponse id
 

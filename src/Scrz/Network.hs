@@ -1,13 +1,13 @@
 module Scrz.Network where
 
-import Data.Maybe
+import           Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as S
 
-import Control.Exception
-import Control.Concurrent
+import Control.Monad
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TVar
+
+import System.Process
 
 import Scrz.Log
 import Scrz.Types
@@ -15,7 +15,8 @@ import Scrz.Utils
 import Scrz.Network.IPv4
 
 
-iptables f args = exec "iptables" args >>= f >> return ()
+iptables :: (ProcessHandle -> IO ()) -> [String] -> IO ()
+iptables f args = void $ exec "iptables" args >>= f
 
 cleanupNetwork :: IO ()
 cleanupNetwork = do
@@ -28,8 +29,8 @@ cleanupNetwork = do
     iptables wait [ "-t", "nat", "-X", "SCRZ" ]
 
 
-initializeNetwork :: String -> IO (IPv4, Set IPv4, Set Int)
-initializeNetwork iface = do
+initializeNetwork :: IO (IPv4, Set IPv4, Set Int)
+initializeNetwork = do
 
     cleanupNetwork
 

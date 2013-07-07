@@ -7,7 +7,6 @@ import qualified Data.Map as M
 import System.Directory
 import System.IO
 
-import Control.Applicative
 import Control.Monad
 
 import Control.Concurrent
@@ -87,8 +86,8 @@ createContainer runtime authority service = do
     return container
 
 
-startContainer :: TVar Runtime -> TVar Container -> Maybe Handle -> IO ()
-startContainer runtime container mbHandle = do
+startContainer :: TVar Container -> Maybe Handle -> IO ()
+startContainer container mbHandle = do
     c <- atomically $ readTVar container
 
     let id            = containerId c
@@ -102,14 +101,14 @@ startContainer runtime container mbHandle = do
             let args = ([ "-n", id, "-f", lxcConfigPath, "-c", "/dev/null", "/sbin/scrz-init" ]) ++ (serviceCommand service)
 
             p <- execEnv "lxc-start" args [] mbHandle
-            forkFinally (wait p) (clearContainerProcess mbHandle)
+            void $ forkFinally (wait p) clearContainerProcess
 
             atomically $ modifyTVar container $ \x ->
                 x { containerProcess = Just p }
 
   where
 
-    clearContainerProcess mbHandle = const $ do
+    clearContainerProcess = const $ do
         logger "lxc-start exited"
         when (isJust mbHandle) $ do
             logger "Closing slave handle"
@@ -118,8 +117,8 @@ startContainer runtime container mbHandle = do
             x { containerProcess = Nothing }
 
 
-stopContainer :: TVar Runtime -> TVar Container -> IO ()
-stopContainer runtime container = do
+stopContainer :: TVar Container -> IO ()
+stopContainer container = do
     c <- atomically $ readTVar container
 
     when (isJust (containerProcess c)) $ do

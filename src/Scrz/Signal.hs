@@ -1,19 +1,13 @@
 module Scrz.Signal (setupSignalHandlers) where
 
-import Data.Maybe
 import Control.Monad
 
 import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TVar
-import Control.Concurrent.STM.TQueue
 
 import System.Posix.Signals
 
-import Network.Socket (close)
-
 import Scrz.Log
-import Scrz.Types
 import Foreign.C
 
 
@@ -37,11 +31,11 @@ signalQueueProcessor controlThread signalQueue = do
 
 
 
-setupSignalHandlers :: ThreadId -> IO (ThreadId)
+setupSignalHandlers :: ThreadId -> IO ()
 setupSignalHandlers controlThread = do
     signalQueue <- newTQueueIO :: IO (TQueue CInt)
-    mapM (setupHandler signalQueue) [ sigINT, sigTERM ]
-    forkIO $ signalQueueProcessor controlThread signalQueue
+    mapM_ (setupHandler signalQueue) [ sigINT, sigTERM ]
+    void $ forkIO $ signalQueueProcessor controlThread signalQueue
 
   where
 

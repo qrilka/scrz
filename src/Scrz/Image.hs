@@ -1,6 +1,5 @@
 module Scrz.Image where
 
-import qualified Data.ByteString.Lazy as BS
 import           Data.Map (Map)
 import qualified Data.Map as M
 
@@ -9,15 +8,10 @@ import System.FilePath
 
 import Control.Monad
 import Control.Applicative
-import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TVar
-
---import           Network.Curl
 
 import Scrz.Types
 import Scrz.Utils
-import Scrz.Log
 import Scrz.Http
 
 
@@ -35,9 +29,9 @@ imageVolumePath image = imageBasePath image </> "volume"
 
 
 getImage :: String -> IO Image
-getImage id = do
+getImage id' = do
     images <- loadImages
-    case M.lookup id images of
+    case M.lookup id' images of
         Nothing -> error "Image not found"
         Just x -> return x
 
@@ -45,7 +39,7 @@ getImage id = do
 loadImages :: IO (Map String Image)
 loadImages = do
     images <- getDirectoryContents baseImageDirectory
-    return $ M.fromList $ map (\id -> (id, Image id "" 0)) images
+    return $ M.fromList $ map (\id' -> (id', Image id' "" 0)) images
 
 
 cloneImage :: Image -> String -> IO ()
@@ -63,19 +57,21 @@ deleteImageClone path = do
 
 snapshotContainerImage :: TVar Container -> String -> IO ()
 snapshotContainerImage container image = do
-    id <- atomically $ containerId <$> readTVar container
-    let rootfsPath = "/srv/scrz/containers/" ++ id ++ "/rootfs"
+    id' <- atomically $ containerId <$> readTVar container
+    let rootfsPath = "/srv/scrz/containers/" ++ id' ++ "/rootfs"
 
     createDirectoryIfMissing True imagePath
-    p <- exec "btrfs" [ "subvolume", "snapshot", rootfsPath, volumePath]
+    p <- exec "btrfs" [ "subvolume", "snapshot", rootfsPath, volumePath']
     wait p
 
   where
 
-    imagePath  = "/srv/scrz/images/" ++ image
-    volumePath = imagePath ++ "/volume"
+    imagePath   = "/srv/scrz/images/" ++ image
+    volumePath' = imagePath ++ "/volume"
 
 
+imageUrl :: Authority -> Image -> String
+imageUrl Local _ = error "Can not construct image url for local authority"
 imageUrl (Remote host) image =
     host ++ "/api/images/" ++ (imageId image) ++ "/content"
 

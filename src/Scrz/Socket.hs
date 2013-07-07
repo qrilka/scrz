@@ -3,8 +3,6 @@ module Scrz.Socket where
 import Data.Aeson
 
 import Control.Monad
-import Control.Applicative
-import Control.Concurrent
 
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString.Lazy
@@ -14,13 +12,17 @@ import Control.Concurrent.STM.TVar
 
 import Scrz.Log
 import Scrz.Types
-import Scrz.Container
 import Scrz.Commands
 
 
-controlSocketPath    = "/var/run/scrz.sock"
+controlSocketPath :: String
+controlSocketPath = "/var/run/scrz.sock"
+
+controlSocketAddress :: SockAddr
 controlSocketAddress = SockAddrUnix controlSocketPath
-createControlSocket  = socket AF_UNIX Stream 0
+
+createControlSocket :: IO Socket
+createControlSocket = socket AF_UNIX Stream 0
 
 serverSocket :: IO Socket
 serverSocket = do
@@ -32,21 +34,21 @@ serverSocket = do
 
 
 handleClient :: TVar Runtime -> Socket -> IO ()
-handleClient runtime socket = do
-    (clientSocket, addr) <- accept socket
-    logger "Accepted connection"
+handleClient runtime sock = do
+    (clientSock, addr) <- accept sock
+    logger $ "Accepted connection from " ++ show addr
 
-    json <- recv clientSocket 99999
-    case decode json of
+    bytes <- recv clientSock 99999
+    case decode bytes of
         Nothing -> do
             logger "Could not decode command"
-            close clientSocket
+            close clientSock
             return ()
 
         Just cmd -> do
             response <- processCommand runtime cmd
-            sendAll clientSocket $ encode response
-            close clientSocket
+            sendAll clientSock $ encode response
+            close clientSock
 
 clientSocket :: IO Socket
 clientSocket = do
@@ -57,11 +59,10 @@ clientSocket = do
 
 sendCommand :: Command -> IO Response
 sendCommand command = do
-    socket <- clientSocket
+    sock <- clientSocket
 
-    sendAll socket (encode command)
-    response <- getContents socket
+    sendAll sock (encode command)
+    response <- getContents sock
     case decode response of
         Nothing -> error $ "Unable to parse response: " ++ show response
-        Just response -> do
-            return response
+        Just resp -> return resp
