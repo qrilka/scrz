@@ -8,17 +8,14 @@ import Data.Map (Map)
 import Data.Map as M
 import System.Process
 import Data.Word
-import Network.Socket
-import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TVar
 
 
 data Image = Image
   { imageId :: String
   , imageChecksum :: String
   , imageSize :: Int
-  } deriving (Eq)
+  } deriving (Show, Eq)
 
 
 data Port = Port
@@ -29,7 +26,7 @@ data Port = Port
   -- ^ If set, the container port is mapped to this specific external port.
   --   Since external ports have to be unique, only a single container can map
   --   to a specific port.
-  } deriving (Eq)
+  } deriving (Show, Eq)
 
 
 data Volume = Volume
@@ -39,7 +36,7 @@ data Volume = Volume
   , volumeBacking :: Maybe String
   -- ^ ID of the backing volume if one should be reused. If Nothing, then the
   --   supervisor creates a new backing volume.
-  } deriving (Eq)
+  } deriving (Show, Eq)
 
 
 data Service = Service
@@ -56,11 +53,11 @@ data Service = Service
     --   external network.
 
   , serviceVolumes :: [ Volume ]
-  } deriving (Eq)
+  } deriving (Show, Eq)
 
 data Config = Config
   { configServices :: [ Service ]
-  }
+  } deriving (Show, Eq)
 
 data BackingVolume = AdHocVolume String | ManagedVolume
   { backingVolumeId :: String

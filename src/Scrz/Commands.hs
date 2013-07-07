@@ -42,25 +42,32 @@ instance FromJSON Service where
         <*> o .: "ports"
         <*> o .: "volumes"
 
+    parseJSON _ = fail "Service"
+
 instance FromJSON Image where
     parseJSON (Object o) = Image
         <$> o .: "id"
         <*> o .: "checksum"
         <*> o .: "size"
+    parseJSON _ = fail "Image"
 
 instance FromJSON Port where
     parseJSON (Object o) = Port
         <$> o .: "internal"
         <*> o .: "external"
+    parseJSON _ = fail "Port"
 
 instance FromJSON Volume where
     parseJSON (Object o) = Volume
         <$> o .: "path"
         <*> o .: "backing"
+    parseJSON _ = fail "Volume"
 
 instance FromJSON Config where
     parseJSON (Object o) = Config
         <$> o .: "services"
+
+    parseJSON _ = fail "Config"
 
 instance ToJSON Service where
     toJSON = undefined

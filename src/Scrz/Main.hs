@@ -1,5 +1,7 @@
 module Main where
 
+import           Data.Maybe
+import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as LBS
@@ -28,11 +30,17 @@ import Scrz.Signal
 import Scrz.Commands
 import Scrz.Terminal
 import Scrz.Utils
+import Scrz.Http
 
 
-createControlThread :: TMVar () -> TVar Runtime -> IO ThreadId
-createControlThread mvar runtime = do
-    forkIO $ forever $ loadLocalConfig >> threadDelay delay
+createControlThread :: TMVar () -> TVar Runtime -> Maybe String -> IO ThreadId
+createControlThread mvar runtime remoteAuthorityUrl = do
+    forkIO $ forever $ loadLocalConfig  >> threadDelay delay
+
+    when (isJust remoteAuthorityUrl) $ do
+        void $ forkIO $ forever $ do
+            syncRemoteConfig (fromJust remoteAuthorityUrl)
+            threadDelay delay
 
     socket <- serverSocket
     forkFinally (forever $ handleClient runtime socket) (cleanup socket)
@@ -49,27 +57,51 @@ createControlThread mvar runtime = do
         removeFile controlSocketPath
         atomically $ putTMVar mvar ()
 
-    addService :: Service -> IO ()
-    addService service = do
-        rt <- atomically $ readTVar runtime
-        exists <- hasContainer rt Local service
-
-        unless exists $ do
-            container <- createContainer runtime Local service
-            startContainer runtime container Nothing
-            id <- atomically $ containerId <$> readTVar container
-            logger $ show id
-
     loadLocalConfig = do
         conf <- LBS.readFile "/etc/scrz/config.json"
 
         case A.decode conf :: Maybe Config of
-            Nothing -> do
-                putStrLn "Could not decode config"
-                threadDelay 10000000
-            Just conf -> do
-                forM (configServices conf) addService
-                threadDelay 10000000
+            Nothing -> putStrLn "Could not decode config"
+            Just config -> mergeConfig runtime Local config
+
+    syncRemoteConfig remoteAuthorityUrl = do
+        let authority = Remote remoteAuthorityUrl
+        config <- getJSON $ remoteAuthorityUrl ++ "/api/conf?host=host.domain.tld"
+        case config of
+            Nothing -> return ()
+            Just x -> mergeConfig runtime authority x
+
+
+mergeConfig :: TVar Runtime -> Authority -> Config -> IO ()
+mergeConfig runtime authority config = do
+    -- Remove old services from the local runtime.
+    rt <- atomically $ readTVar runtime
+    forM_ (M.elems $ containers rt) $ \container -> do
+        c <- atomically $ readTVar container
+
+        let matchAuthority = authority == containerAuthority c
+        let hasService = L.elem (containerService c) (configServices config)
+
+        when (matchAuthority && not hasService) $ do
+            logger $ "Service removed from the configuration, stopping container"
+            stopContainer runtime container
+            destroyContainer runtime container
+
+    -- Add new services from the authority.
+    forM_ (configServices config) addService
+
+  where
+
+    addService :: Service -> IO ()
+    addService service = do
+        rt <- atomically $ readTVar runtime
+        exists <- hasContainer rt authority service
+
+        unless exists $ do
+            container <- createContainer runtime authority service
+            startContainer runtime container Nothing
+            id <- atomically $ containerId <$> readTVar container
+            logger $ show id
 
 
 initializeRuntime :: IO Runtime
@@ -85,13 +117,12 @@ initializeRuntime = do
       }
 
 
-
-run :: [ String ] -> IO ()
-run [ "supervisor" ] = do
+startSupervisor :: Maybe String -> IO ()
+startSupervisor remoteAuthorityUrl = do
     runtime <- newTVarIO =<< initializeRuntime
 
     mvar <- newEmptyTMVarIO
-    controlThread <- createControlThread mvar runtime
+    controlThread <- createControlThread mvar runtime remoteAuthorityUrl
     setupSignalHandlers controlThread
 
     -- Wait for the control thread to finish.
@@ -101,6 +132,11 @@ run [ "supervisor" ] = do
     mapM_ (\x -> stopContainer runtime x >> destroyContainer runtime x) $ M.elems (containers rt)
 
     cleanupNetwork
+
+
+run :: [ String ] -> IO ()
+run [ "supervisor" ] = startSupervisor Nothing
+run [ "supervisor", remoteAuthorityUrl ] = startSupervisor $ Just remoteAuthorityUrl
 
 run [ "create-container", name, image ] = undefined
     --sendCommand $ CreateContainer name image
@@ -193,8 +229,6 @@ data RunArgs = RunArgs
   } deriving (Show)
 
 parseRunArguments :: RunArgs -> [String] -> RunArgs
-parseRunArguments ra [] = ra
-
 parseRunArguments ra ("--save-as" : id : args) =
     let pra = ra { runArgsSaveAs = Just id }
     in parseRunArguments pra args
@@ -203,8 +237,10 @@ parseRunArguments ra ("--mount" : bv : mp : args) =
     let pra = ra { runArgsMounts = (bv,mp) : runArgsMounts ra }
     in parseRunArguments pra args
 
-parseRunArguments ra (image : command) = ra { runArgsImage = image, runArgsCommand = command }
+parseRunArguments ra (image : command) =
+    ra { runArgsImage = image, runArgsCommand = command }
 
+parseRunArguments ra [] = ra
 parseRunArguments _ _ = error "Unable to parse arguments"
 
 main :: IO ()

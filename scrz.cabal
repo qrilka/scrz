@@ -34,21 +34,25 @@ Source-Repository head
 
 Executable scrz
 
-    Build-depends:  aeson       >= 0
-    Build-depends:  base        >= 4.0     && < 5
-    Build-depends:  bytestring  >= 0.10
-    Build-depends:  containers  >= 0.5
-    Build-depends:  directory   >= 0
-    Build-depends:  mtl         >= 0
-    Build-depends:  network     >= 0
-    Build-depends:  old-locale  >= 0
-    Build-depends:  process     >= 1.1.0
-    Build-depends:  random      >= 0
-    Build-depends:  MonadRandom >= 0
-    Build-depends:  stm         >= 2.0
-    Build-depends:  text        >= 0
-    Build-depends:  time        >= 0
-    Build-depends:  unix        >= 2.0
+    Build-depends:  MonadRandom   >= 0
+    Build-depends:  aeson         >= 0
+    Build-depends:  base          >= 4.0     && < 5
+    Build-depends:  bytestring    >= 0.10
+    Build-depends:  conduit       >= 0
+    Build-depends:  containers    >= 0
+    Build-depends:  directory     >= 0
+    Build-depends:  filepath      >= 0
+    Build-depends:  http-conduit  >= 0
+    Build-depends:  http-types    >= 0
+    Build-depends:  mtl           >= 0
+    Build-depends:  network       >= 0
+    Build-depends:  old-locale    >= 0
+    Build-depends:  process       >= 1.1.0
+    Build-depends:  random        >= 0
+    Build-depends:  stm           >= 2.0
+    Build-depends:  text          >= 0
+    Build-depends:  time          >= 0
+    Build-depends:  unix          >= 2.0
 
     Hs-Source-Dirs: src
 

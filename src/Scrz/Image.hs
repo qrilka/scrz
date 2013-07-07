@@ -5,6 +5,7 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 
 import System.Directory
+import System.FilePath
 
 import Control.Monad
 import Control.Applicative
@@ -17,9 +18,20 @@ import Control.Concurrent.STM.TVar
 import Scrz.Types
 import Scrz.Utils
 import Scrz.Log
+import Scrz.Http
 
 
+baseImageDirectory :: String
 baseImageDirectory = "/srv/scrz/images"
+
+imageBasePath :: Image -> String
+imageBasePath image = baseImageDirectory </> imageId image
+
+imageContentPath :: Image -> String
+imageContentPath image = imageBasePath image </> "content"
+
+imageVolumePath :: Image -> String
+imageVolumePath image = imageBasePath image </> "volume"
 
 
 getImage :: String -> IO Image
@@ -39,12 +51,9 @@ loadImages = do
 cloneImage :: Image -> String -> IO ()
 cloneImage image path = do
 
-    p <- exec "btrfs" [ "subvolume", "snapshot", imagePath, path ]
+    p <- exec "btrfs" [ "subvolume", "snapshot", imageVolumePath image, path ]
     fatal p
 
-  where
-
-    imagePath = "/srv/scrz/images/" ++ (imageId image) ++ "/volume"
 
 deleteImageClone :: String -> IO ()
 deleteImageClone path = do
@@ -67,58 +76,36 @@ snapshotContainerImage container image = do
     volumePath = imagePath ++ "/volume"
 
 
-imageUrl authority image =
-    "http://localhost:3000/api/images/" ++ (imageId image) ++ "/content"
+imageUrl (Remote host) image =
+    host ++ "/api/images/" ++ (imageId image) ++ "/content"
 
 
 ensureImage :: Authority -> Image -> IO ()
+ensureImage Local image = do
+    imageVolumeExists <- doesDirectoryExist $ imageVolumePath image
+    unless imageVolumeExists $
+        error $ "Volume for image " ++ imageId image ++ " does not exist"
+
 ensureImage authority image = do
-    let imageFileName = "/srv/scrz/images/" ++ (imageId image) ++ "/content"
-    exists <- doesFileExist imageFileName
-    unless exists (downloadImage authority image)
+    imageContentExists <- doesFileExist $ imageContentPath image
+    unless imageContentExists $ downloadImage authority image
+
+    imageVolumeExists <- doesDirectoryExist $ imageVolumePath image
+    unless imageVolumeExists $ unpackImage image
 
 
 downloadImage :: Authority -> Image -> IO ()
-downloadImage authority image = return ()
+downloadImage authority image = do
+    createDirectoryIfMissing True $ imageBasePath image
+    downloadBinary (imageUrl authority image) $ imageContentPath image
 
-{- TODO: Replace with pure haskell http client
-
-    let url = imageUrl authority image
-    logger $ "Downloading slug from " ++ url
-
-    (code, stream) <- curlGetString_ url curlOptions
-    case code of
-        CurlOK -> do
-            let imageFileName = "/srv/scrz/images/" ++ (imageId image) ++ "/content"
-            createDirectoryIfMissing True $ "/srv/scrz/images/" ++ (imageId image)
-            BS.writeFile imageFileName stream
-            unpackImage image
-
-        otherwise -> do
-            logger $ "Failed to download the slug: " ++ (show code)
-            return ()
-
-  where
-
-    curlOptions = [ CurlPost False, CurlNoBody False, CurlFollowLocation True ]
--}
 
 unpackImage :: Image -> IO ()
 unpackImage image = do
-    fatal =<< exec "btrfs" [ "subvolume", "create", imageVolumePath ]
-    fatal =<< exec "tar" [ "-xf", imageFileName, "-C", imageVolumePath ]
-
-  where
-
-    imageVolumePath = "/srv/scrz/images/" ++ (imageId image) ++ "/volume"
-    imageFileName   = "/srv/scrz/images/" ++ (imageId image) ++ "/content"
+    fatal =<< exec "btrfs" [ "subvolume", "create", imageVolumePath image ]
+    fatal =<< exec "tar" [ "-xf", imageContentPath image, "-C", imageVolumePath image ]
 
 
 packImage :: Image -> IO ()
 packImage image = do
-    fatal =<< exec "tar" [ "-cJf", imageFileName, "-C", imageVolumePath, "." ]
-
-  where
-
-    imageVolumePath = "/srv/scrz/images/" ++ (imageId image) ++ "/volume"
-    imageFileName   = "/srv/scrz/images/" ++ (imageId image) ++ "/content"
+    fatal =<< exec "tar" [ "-cJf", imageContentPath image, "-C", imageVolumePath image, "." ]
