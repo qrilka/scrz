@@ -67,7 +67,7 @@ backingVolumePath (AdHocVolume path) = path
 backingVolumePath (ManagedVolume vid) = "/srv/scrz/volumes/" ++ vid
 
 
-data Authority = Local | Remote String
+data Authority = Local | Socket | Remote String
     deriving (Eq)
 
 data Container = Container

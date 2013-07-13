@@ -178,7 +178,7 @@ processCommand _ Quit = do
 processCommand runtime (CreateContainer service) = do
     logger $ "Creating container " ++ (show $ serviceRevision service)
 
-    container <- createContainer runtime Local service
+    container <- createContainer runtime Socket service
     startContainer container Nothing
     id <- atomically $ containerId <$> readTVar container
     return $ CreateContainerResponse id
@@ -248,7 +248,7 @@ processCommand runtime (Run image command pts mounts) = do
       , serviceVolumes = map (\(a,b) -> Volume a (Just b)) mounts
       }
 
-    container <- createContainer runtime Local service
+    container <- createContainer runtime Socket service
     startContainer container (Just handle1)
     id <- atomically $ containerId <$> readTVar container
     return $ CreateContainerResponse id
