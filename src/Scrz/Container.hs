@@ -62,20 +62,23 @@ createContainer runtime authority service = do
 
  -- Create directories for the mount points
     forM_ (serviceVolumes service) $ \volume -> do
-        let mountPoint = "/srv/scrz/containers/" ++ id ++ "/rootfs" ++ (volumePath volume)
+        let mountPoint = rootfsPath ++ (volumePath volume)
         createDirectoryIfMissing True mountPoint
 
 
  -- Update container config files (/etc/hosts, /etc/portmap, ...)
-    fqdn <- fullyQualifiedDomainName
-    let hostsLine = ["127.0.0.1", fromMaybe "" fqdn, id, "localhost" ]
-    writeFile (containerPath ++ "/rootfs/etc/hosts") $ intercalate " " hostsLine
+    let hostsLine = ["127.0.0.1", id, "localhost" ]
+    writeFile (rootfsPath ++ "/etc/hosts") $ intercalate " " hostsLine
 
     let sports  = servicePorts service
     let cports  = externalPorts
     let ports   = zip sports cports
     let portmap = map (\(int, ext) -> (show $ internalPort int) ++ "=" ++ (show ext)) ports
-    writeFile (containerPath ++ "/rootfs/etc/portmap") $ intercalate " " portmap
+    writeFile (rootfsPath ++ "/etc/portmap") $ intercalate " " portmap
+
+    -- TODO: Do something sensible when the FQDN isn't known.
+    fqdn <- fullyQualifiedDomainName
+    writeFile (rootfsPath ++ "/etc/scrz-host-domain") $ fromMaybe "" fqdn
 
 
  -- Register the container in the runtime.
