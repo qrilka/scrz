@@ -67,11 +67,13 @@ createControlThread mvar runtime remoteAuthorityUrl = do
             Just config -> mergeConfig runtime Local config
 
     syncRemoteConfig url = do
-        let authority = Remote url
-        config <- getJSON $ url ++ "/api/conf?host=host.domain.tld"
-        case config of
-            Nothing -> return ()
-            Just x -> mergeConfig runtime authority x
+        fqdn <- fullyQualifiedDomainName
+        withMaybe fqdn $ \fqdn -> do
+            let authority = Remote url
+            config <- getJSON $ url ++ "/api/conf?host=" ++ fqdn
+            case config of
+                Nothing -> return ()
+                Just x -> mergeConfig runtime authority x
 
 
 mergeConfig :: TVar Runtime -> Authority -> Config -> IO ()

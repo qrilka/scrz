@@ -9,6 +9,7 @@ import System.IO
 
 import Control.Monad
 
+import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
 
@@ -19,17 +20,7 @@ import Scrz.LXC
 import Scrz.Network
 import Scrz.Volume
 import Scrz.Log
-
-import Network.BSD
-import Network.Socket
-import Control.Applicative
-
-fullyQualifiedDomainName :: IO (Maybe String)
-fullyQualifiedDomainName = do
-    hostName <- Just <$> getHostName
-    addrInfo <- head <$> getAddrInfo Nothing hostName Nothing
-    fst <$> getNameInfo [] True False (addrAddress addrInfo)
-
+import Scrz.Utils
 
 createContainer :: TVar Runtime -> Authority -> Service -> IO (TVar Container)
 createContainer runtime authority service = do

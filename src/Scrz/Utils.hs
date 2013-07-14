@@ -5,6 +5,10 @@ import Control.Monad.Random
 import System.Process
 import System.IO
 import System.Exit
+import Network.BSD
+import Network.Socket
+import Control.Applicative
+
 
 newId :: IO String
 newId = evalRandIO (sequence (replicate 10 rnd))
@@ -35,3 +39,9 @@ fatal p = do
 
 kill :: ProcessHandle -> IO ()
 kill = terminateProcess
+
+fullyQualifiedDomainName :: IO (Maybe String)
+fullyQualifiedDomainName = do
+    hostName <- Just <$> getHostName
+    addrInfo <- head <$> getAddrInfo Nothing hostName Nothing
+    fst <$> getNameInfo [] True False (addrAddress addrInfo)
