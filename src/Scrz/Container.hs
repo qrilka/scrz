@@ -20,7 +20,6 @@ import Scrz.LXC
 import Scrz.Network
 import Scrz.Volume
 import Scrz.Log
-import Scrz.Utils
 
 createContainer :: TVar Runtime -> Authority -> Service -> IO (TVar Container)
 createContainer runtime authority service = do

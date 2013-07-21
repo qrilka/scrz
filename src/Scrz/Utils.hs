@@ -5,7 +5,7 @@ import Control.Monad.Random
 import System.Process
 import System.IO
 import System.Exit
-import Network.BSD
+import Network.BSD (getHostName)
 import Network.Socket
 import Control.Applicative
 

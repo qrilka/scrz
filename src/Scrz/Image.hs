@@ -71,7 +71,8 @@ snapshotContainerImage container image = do
 
 
 imageUrl :: Authority -> Image -> String
-imageUrl Local _ = error "Can not construct image url for local authority"
+imageUrl Socket _ = error "Can not construct image url for socket authority"
+imageUrl Local  _ = error "Can not construct image url for local authority"
 imageUrl (Remote host) image =
     host ++ "/api/images/" ++ (imageId image) ++ "/content"
 

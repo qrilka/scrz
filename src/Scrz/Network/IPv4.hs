@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Scrz.Network.IPv4 where
 
 import Data.Bits
