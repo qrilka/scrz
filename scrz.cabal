@@ -66,4 +66,4 @@ Executable scrz
     Extensions:     ScopedTypeVariables
     Extensions:     ViewPatterns
 
-    Ghc-Options:    -threaded -Wall
+    Ghc-Options:    -threaded -Wall -Werror

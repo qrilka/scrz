@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Scrz.Commands where
 
 import Prelude hiding (id)

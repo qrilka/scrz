@@ -23,7 +23,7 @@ import Scrz.Log
 
 createContainer :: TVar Runtime -> Authority -> Service -> IO (TVar Container)
 createContainer runtime authority service = do
-    id <- newId
+    id' <- newId
 
 
  -- Make sure the image is downloaded and ready to use.
@@ -34,11 +34,11 @@ createContainer runtime authority service = do
     addr <- allocateAddress runtime
     externalPorts <- forM (servicePorts service) (allocatePort runtime)
     mapPorts addr $ zip externalPorts $ servicePorts service
-    backingVolumes <- allocateVolumes runtime service
+    backingVolumes' <- allocateVolumes runtime service
 
 
  -- Prepare the filesystem (clone image, write LXC config file).
-    let containerPath  = "/srv/scrz/containers/" ++ id
+    let containerPath  = "/srv/scrz/containers/" ++ id'
     let rootfsPath     = containerPath ++ "/rootfs"
     let lxcConfigPath  = containerPath ++ "/config"
     gatewayAddress <- atomically $ bridgeAddress <$> readTVar runtime
@@ -46,8 +46,8 @@ createContainer runtime authority service = do
     createDirectoryIfMissing True containerPath
     cloneImage (serviceImage service) rootfsPath
 
-    let volumes = zip backingVolumes (serviceVolumes service)
-    writeFile lxcConfigPath $ lxcConfig id addr gatewayAddress rootfsPath volumes
+    let volumes = zip backingVolumes' (serviceVolumes service)
+    writeFile lxcConfigPath $ lxcConfig id' addr gatewayAddress rootfsPath volumes
 
 
  -- Create directories for the mount points
@@ -57,7 +57,7 @@ createContainer runtime authority service = do
 
 
  -- Update container config files (/etc/hosts, /etc/portmap, ...)
-    let hostsLine = ["127.0.0.1", id, "localhost" ]
+    let hostsLine = ["127.0.0.1", id', "localhost" ]
     writeFile (rootfsPath ++ "/etc/hosts") $ intercalate " " hostsLine
 
     let sports  = servicePorts service
@@ -72,9 +72,9 @@ createContainer runtime authority service = do
 
 
  -- Register the container in the runtime.
-    container <- newTVarIO $ Container id authority service addr externalPorts backingVolumes Nothing
+    container <- newTVarIO $ Container id' authority service addr externalPorts backingVolumes' Nothing
     atomically $ modifyTVar runtime $ \x ->
-        x { containers = M.insert id container (containers x) }
+        x { containers = M.insert id' container (containers x) }
 
     return container
 
@@ -83,15 +83,15 @@ startContainer :: TVar Container -> Maybe Handle -> IO ()
 startContainer container mbHandle = do
     c <- atomically $ readTVar container
 
-    let id            = containerId c
-    let containerPath = "/srv/scrz/containers/" ++ id
+    let id'           = containerId c
+    let containerPath = "/srv/scrz/containers/" ++ id'
     let lxcConfigPath = containerPath ++ "/config"
     let service       = containerService c
 
     if isJust $ containerProcess c
         then return ()
         else do
-            let args = ([ "-n", id, "-f", lxcConfigPath, "-c", "/dev/null", "/sbin/scrz-init" ]) ++ (serviceCommand service)
+            let args = ([ "-n", id', "-f", lxcConfigPath, "-c", "/dev/null", "/sbin/scrz-init" ]) ++ (serviceCommand service)
 
             p <- execEnv "lxc-start" args [] mbHandle
             void $ forkFinally (wait p) clearContainerProcess
@@ -143,8 +143,8 @@ destroyContainer runtime container0 = do
 
 
  -- Delete resources from the filesystem.
-    let id            = containerId container
-    let containerPath = "/srv/scrz/containers/" ++ id
+    let id'           = containerId container
+    let containerPath = "/srv/scrz/containers/" ++ id'
     let rootfsPath    = containerPath ++ "/rootfs"
 
     deleteImageClone rootfsPath
@@ -153,4 +153,4 @@ destroyContainer runtime container0 = do
 
  -- Unregister the container from the runtime.
     atomically $ modifyTVar runtime $ \x ->
-        x { containers = M.delete id (containers x) }
+        x { containers = M.delete id' (containers x) }

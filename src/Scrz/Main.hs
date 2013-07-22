@@ -44,8 +44,8 @@ createControlThread mvar runtime remoteAuthorityUrl = do
             syncRemoteConfig url
             threadDelay delay
 
-    socket <- serverSocket
-    forkFinally (forever $ handleClient runtime socket) (cleanup socket)
+    sock <- serverSocket
+    forkFinally (forever $ handleClient runtime sock) (cleanup sock)
 
 
   where
@@ -53,9 +53,9 @@ createControlThread mvar runtime remoteAuthorityUrl = do
     delay = 10 * 1000 * 1000
 
     cleanup :: Socket -> Either SomeException () -> IO ()
-    cleanup socket ex = do
+    cleanup sock ex = do
         logger $ show ex
-        close socket
+        close sock
         removeFile controlSocketPath
         atomically $ putTMVar mvar ()
 
@@ -67,8 +67,8 @@ createControlThread mvar runtime remoteAuthorityUrl = do
             Just config -> mergeConfig runtime Local config
 
     syncRemoteConfig url = do
-        fqdn <- fullyQualifiedDomainName
-        withMaybe fqdn $ \fqdn -> do
+        fqdn' <- fullyQualifiedDomainName
+        withMaybe fqdn' $ \fqdn -> do
             let authority = Remote url
             config <- getJSON $ url ++ "/api/conf?host=" ++ fqdn
             case config of
@@ -104,18 +104,18 @@ mergeConfig runtime authority config = do
         unless exists $ do
             container <- createContainer runtime authority service
             startContainer container Nothing
-            id <- atomically $ containerId <$> readTVar container
-            logger $ show id
+            id' <- atomically $ containerId <$> readTVar container
+            logger $ show id'
 
 
 initializeRuntime :: IO Runtime
 initializeRuntime = do
-    (bridgeAddress, networkAddresses, networkPorts) <- initializeNetwork
+    (bridgeAddress', networkAddresses', networkPorts') <- initializeNetwork
 
     return $ Runtime
-      { bridgeAddress     = bridgeAddress
-      , networkAddresses  = networkAddresses
-      , networkPorts      = networkPorts
+      { bridgeAddress     = bridgeAddress'
+      , networkAddresses  = networkAddresses'
+      , networkPorts      = networkPorts'
       , backingVolumes    = M.empty
       , containers        = M.empty
       }
@@ -143,50 +143,43 @@ run [ "supervisor" ] = startSupervisor Nothing
 run [ "supervisor", remoteAuthorityUrl ] = startSupervisor $ Just remoteAuthorityUrl
 
 run [ "list-containers" ] = do
-    sendCommand ListContainers >>= printResponse
-    return ()
+    void $ sendCommand ListContainers >>= printResponse
 
 run [ "ps" ] = do
-    sendCommand ListContainers >>= printResponse
-    return ()
+    void $ sendCommand ListContainers >>= printResponse
 
-run [ "stop-container", id ] = do
-    sendCommand $ StopContainer id
-    return ()
+run [ "stop-container", id' ] = do
+    void $ sendCommand $ StopContainer id'
 
-run [ "destroy-container", id ] = do
-    sendCommand $ DestroyContainer id
-    return ()
+run [ "destroy-container", id' ] = do
+    void $ sendCommand $ DestroyContainer id'
 
-run [ "start", id ] = do
-    sendCommand $ Start id
-    return ()
+run [ "start", id' ] = do
+    void $ sendCommand $ Start id'
 
 run [ "snapshot", container, image ] = do
-    sendCommand $ Snapshot container image
-    return ()
+    void $ sendCommand $ Snapshot container image
 
 run [ "quit" ] = do
-    sendCommand $ Quit
-    return ()
+    void $ sendCommand $ Quit
 
-run [ "console", id ] = do
-    executeFile "lxc-console" True [ "-n", id ] Nothing
+run [ "console", id' ] = do
+    executeFile "lxc-console" True [ "-n", id' ] Nothing
 
 run [ "list-images" ] = do
     images <- loadImages
-    forM_ (M.toList images) $ \(id, image) -> do
+    forM_ (M.toList images) $ \(_, image) -> do
         when ('.' /= head (imageId image)) $ do
             putStrLn $ imageId image
 
-run [ "pack-image", id ] = do
-    image <- getImage id
+run [ "pack-image", id' ] = do
+    image <- getImage id'
     packImage image
 
 run ("run":args) = do
     let ra = parseRunArguments (RunArgs "" [] [] Nothing) args
 
-    (ptm, pts) <- openPseudoTerminal
+    (ptm, _) <- openPseudoTerminal
     slaveName <- getSlaveTerminalName ptm
     response <- sendCommand $ Run (runArgsImage ra) (runArgsCommand ra) slaveName (runArgsMounts ra)
 
@@ -194,25 +187,17 @@ run ("run":args) = do
 
     let pump src dst = fdRead src 999 >>= \(x, _) -> fdWrite dst x
 
-    forkFinally (forever $ pump ptm stdOutput) (const $ return ())
-    forkFinally (forever $ pump stdInput ptm)  (const $ return ())
+    void $ forkFinally (forever $ pump ptm stdOutput) (const $ return ())
+    void $ forkFinally (forever $ pump stdInput ptm)  (const $ return ())
 
     case response of
-        CreateContainerResponse id -> do
-            sendCommand $ Wait id
+        CreateContainerResponse id' -> do
+            void $ sendCommand $ Wait id'
             resetModeFd stdInput attr1
-            imageId <- maybe newId return (runArgsSaveAs ra)
-            logger $ "Saving image under id " ++ imageId
-            sendCommand $ Snapshot id imageId
-            return ()
-
-        _ -> return ()
-
-
-
-    case response of
-        CreateContainerResponse id -> do
-            sendCommand $ DestroyContainer id
+            imageId' <- maybe newId return (runArgsSaveAs ra)
+            logger $ "Saving image under id " ++ imageId'
+            void $ sendCommand $ Snapshot id' imageId'
+            void $ sendCommand $ DestroyContainer id'
             return ()
 
         _ -> return ()
@@ -230,8 +215,8 @@ data RunArgs = RunArgs
   } deriving (Show)
 
 parseRunArguments :: RunArgs -> [String] -> RunArgs
-parseRunArguments ra ("--save-as" : id : args) =
-    let pra = ra { runArgsSaveAs = Just id }
+parseRunArguments ra ("--save-as" : id' : args) =
+    let pra = ra { runArgsSaveAs = Just id' }
     in parseRunArguments pra args
 
 parseRunArguments ra ("--mount" : bv : mp : args) =
@@ -242,7 +227,6 @@ parseRunArguments ra (image : command) =
     ra { runArgsImage = image, runArgsCommand = command }
 
 parseRunArguments ra [] = ra
-parseRunArguments _ _ = error "Unable to parse arguments"
 
 main :: IO ()
 main = getArgs >>= run
