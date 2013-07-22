@@ -37,7 +37,7 @@ withMaybe (Just a) f = f a
 
 createControlThread :: TMVar () -> TVar Runtime -> Maybe String -> IO ThreadId
 createControlThread mvar runtime remoteAuthorityUrl = do
-    void $ forkIO $ forever $ loadLocalConfig  >> threadDelay delay
+    void $ forkIO $ forever $ loadLocalConfig >> threadDelay delay
 
     withMaybe remoteAuthorityUrl $ \url -> do
         void $ forkIO $ forever $ do

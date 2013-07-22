@@ -39,7 +39,8 @@ data Volume = Volume
 
 
 data Service = Service
-  { serviceRevision :: Int
+  { serviceId :: Int
+  , serviceRevision :: Int
   , serviceImage :: Image
   , serviceCommand :: [ String ]
     -- ^ Command and arguments that are executed to start this service.

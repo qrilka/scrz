@@ -30,7 +30,8 @@ data Command
 
 instance FromJSON Service where
     parseJSON (Object o) = Service
-        <$> o .: "revision"
+        <$> o .: "id"
+        <*> o .: "revision"
         <*> o .: "image"
         <*> o .: "command"
         <*> o .: "environment"
@@ -240,7 +241,8 @@ processCommand runtime (Run image command pts mounts) = do
     handle <- openFile pts ReadWriteMode
     let handle1 = handle
 
-    let service = Service { serviceRevision = 0
+    let service = Service { serviceId = 0
+      , serviceRevision = 0
       , serviceImage = Image image "" 0
       , serviceCommand = command
       , serviceEnvironment = []
