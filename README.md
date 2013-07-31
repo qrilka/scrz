@@ -1,3 +1,3 @@
-Scrz is (an imcomplete) [docker] clone written in Haskell.
+Scrz is (an incomplete) [docker] clone written in Haskell.
 
 [docker]: http://docker.io
